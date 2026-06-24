@@ -59,7 +59,7 @@ export default function App() {
   };
 
   const stats = snapshot.latestStatistics;
-  const recentStatistics = snapshot.statistics.slice(-7).reverse();
+  const recentStatistics = snapshot.recentStatistics.slice(-7).reverse();
 
   return (
     <main className="app-shell">

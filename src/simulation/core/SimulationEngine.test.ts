@@ -67,6 +67,36 @@ describe("SimulationEngine", () => {
     expect(final!.unmetFoodDemand).toBeGreaterThan(0);
   });
 
+  it("서로 다른 시드는 서로 다른 사회 궤적을 만든다", () => {
+    const a = new SimulationEngine({ seed: "divergence-a" });
+    const b = new SimulationEngine({ seed: "divergence-b" });
+
+    a.runDays(100);
+    b.runDays(100);
+
+    const statsA = a.getSnapshot().statistics;
+    const statsB = b.getSnapshot().statistics;
+    // 토지 비옥도가 시드별로 달라 매일 생산량이 갈리므로 궤적이 동일하지 않다.
+    expect(a.getSnapshot().landFertility).not.toBe(b.getSnapshot().landFertility);
+    expect(JSON.stringify(statsA)).not.toBe(JSON.stringify(statsB));
+  });
+
+  it("1,000일 동안 유한하고 경계를 벗어나지 않는 통계를 만든다", () => {
+    const engine = new SimulationEngine({ seed: "long-horizon" });
+    const statistics = engine.runDays(1_000);
+
+    expect(statistics).toHaveLength(1_000);
+    for (const day of statistics) {
+      for (const value of Object.values(day)) {
+        expect(Number.isFinite(value)).toBe(true);
+      }
+      expect(day.population).toBeGreaterThanOrEqual(0);
+      expect(day.foodStock).toBeGreaterThanOrEqual(0);
+      expect(day.averageHappiness).toBeGreaterThanOrEqual(0);
+      expect(day.averageHappiness).toBeLessThanOrEqual(100);
+    }
+  });
+
   it("동일한 설정과 시드에서 100일 결과가 완전히 같다", () => {
     const first = new SimulationEngine({ seed: "replay-test" });
     const second = new SimulationEngine({ seed: "replay-test" });

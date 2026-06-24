@@ -11,8 +11,15 @@ export {
 } from "./core/SimulationClock";
 export { SeededRandom } from "./core/SeededRandom";
 export type {
-  Building,
-  Citizen,
-  DailyStatistics,
-  SimulationSnapshot,
+  SimulationSystem,
+  SystemContext,
+} from "./core/SystemPipeline";
+export {
+  createResourcePool,
+  type Building,
+  type Citizen,
+  type DailyStatistics,
+  type ResourcePool,
+  type ResourceType,
+  type SimulationSnapshot,
 } from "./types";

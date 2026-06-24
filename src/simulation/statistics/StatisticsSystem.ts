@@ -23,7 +23,8 @@ export function createDailyStatistics(
     .filter((building) => building.type === "house")
     .reduce((sum, building) => sum + building.capacity, 0);
 
-  return {
+  // 생성 시 동결: 스냅샷이 깊은 복사 없이 불변 참조를 공유할 수 있게 한다.
+  return Object.freeze({
     day,
     population,
     foodStock: round(state.resources.food),
@@ -42,7 +43,7 @@ export function createDailyStatistics(
     housingCapacity,
     housingDemand: calculateBuildingDemand(state, config).houses,
     populationLost: foodResult.populationLost,
-  };
+  });
 }
 
 export function createInitialStatistics(
