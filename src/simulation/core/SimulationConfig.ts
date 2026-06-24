@@ -1,3 +1,6 @@
+export const TICKS_PER_DAY = 144;
+export const MINUTES_PER_TICK = 10;
+
 export interface SimulationConfig {
   seed: string;
   initialPopulation: number;
@@ -16,28 +19,47 @@ export interface SimulationConfig {
   hungerGainAtZeroFood: number;
   severeHungerThreshold: number;
   baseSevereHungerExitChance: number;
-
-  // 마을별 토지 비옥도. 시드에서 [min, max] 범위로 뽑아 농부 생산성에 곱한다.
-  // 같은 base 설정이라도 시드마다 다른 사회 궤적이 나오도록 하는 핵심 분산 장치.
   landFertilityMin: number;
   landFertilityMax: number;
-  // 적용된 비옥도(엔진이 시드로부터 계산해 덮어쓴다). 기본 설정값은 중립값 1.
   landFertility: number;
-  // 매일 생산에 적용하는 ±비율의 확률 요동. 0이면 요동 없음.
   dailyProductionNoise: number;
+  farmerHealthProductivityFloor: number;
+  hungerHealthThreshold: number;
+  healthLossPerHungerOverThreshold: number;
+  healthRecoveryPerDay: number;
+  canWorkHealthThreshold: number;
+  happinessBase: number;
+  happinessFoodWeight: number;
+  happinessHealthWeight: number;
+  happinessHungerPenaltyWeight: number;
+  happinessEmployedBonus: number;
+  happinessUnemployedPenalty: number;
 
-  // --- 생산성/건강/행복 공식 상수 (데이터 기반 튜닝용) ---
-  farmerHealthProductivityFloor: number; // 건강이 낮아도 보장되는 최소 생산성 비율
-  hungerHealthThreshold: number; // 이 배고픔을 넘으면 건강이 깎인다
-  healthLossPerHungerOverThreshold: number; // 임계 초과 배고픔 1당 건강 감소
-  healthRecoveryPerDay: number; // 배부를 때 하루 건강 회복량
-  canWorkHealthThreshold: number; // 이 건강 이하이면 노동 불가
-  happinessBase: number; // 행복도 기본값
-  happinessFoodWeight: number; // 식량 충족도 가중치
-  happinessHealthWeight: number; // 건강 가중치
-  happinessHungerPenaltyWeight: number; // 배고픔 가중 패널티
-  happinessEmployedBonus: number; // 농부(고용) 보너스
-  happinessUnemployedPenalty: number; // 무직 패널티
+  ticksPerDay: number;
+  minutesPerTick: number;
+  millisecondsPerTick: number;
+  gridSize: number;
+  mapWidth: number;
+  mapHeight: number;
+  perceptionRadius: number;
+  decisionCooldownTicks: number;
+  movementCellsPerTick: number;
+  hungerGainPerTick: number;
+  fatigueGainPerTick: number;
+  fatigueRecoveryPerRestTick: number;
+  emergencyHungerThreshold: number;
+  eatHungerThreshold: number;
+  foodPerMeal: number;
+  mealHungerRecovery: number;
+  eatActionTicks: number;
+  farmActionTicks: number;
+  farmFoodPerAction: number;
+  carryPickupTicks: number;
+  carryDropoffTicks: number;
+  carryCapacity: number;
+  restActionTicks: number;
+  constructionProgressPerTick: number;
+  buildTaskCapacity: number;
 }
 
 export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
@@ -58,12 +80,10 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   hungerGainAtZeroFood: 34,
   severeHungerThreshold: 78,
   baseSevereHungerExitChance: 0.055,
-
   landFertilityMin: 0.55,
   landFertilityMax: 1.35,
   landFertility: 1,
   dailyProductionNoise: 0.1,
-
   farmerHealthProductivityFloor: 0.35,
   hungerHealthThreshold: 55,
   healthLossPerHungerOverThreshold: 0.08,
@@ -75,13 +95,38 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   happinessHungerPenaltyWeight: 0.48,
   happinessEmployedBonus: 7,
   happinessUnemployedPenalty: -4,
+
+  ticksPerDay: TICKS_PER_DAY,
+  minutesPerTick: MINUTES_PER_TICK,
+  millisecondsPerTick: 120,
+  gridSize: 20,
+  mapWidth: 760,
+  mapHeight: 520,
+  perceptionRadius: 220,
+  decisionCooldownTicks: 8,
+  movementCellsPerTick: 1,
+  hungerGainPerTick: 0.34,
+  fatigueGainPerTick: 0.18,
+  fatigueRecoveryPerRestTick: 2.4,
+  emergencyHungerThreshold: 72,
+  eatHungerThreshold: 32,
+  foodPerMeal: 1,
+  mealHungerRecovery: 70,
+  eatActionTicks: 4,
+  farmActionTicks: 20,
+  farmFoodPerAction: 1.5,
+  carryPickupTicks: 2,
+  carryDropoffTicks: 2,
+  carryCapacity: 4,
+  restActionTicks: 18,
+  constructionProgressPerTick: 0.65,
+  buildTaskCapacity: 4,
 };
 
 export function createSimulationConfig(
   overrides: Partial<SimulationConfig> = {},
 ): SimulationConfig {
   const config = { ...DEFAULT_SIMULATION_CONFIG, ...overrides };
-
   const nonNegativeKeys: Array<keyof SimulationConfig> = [
     "initialPopulation",
     "initialFood",
@@ -91,6 +136,10 @@ export function createSimulationConfig(
     "initialWarehouses",
     "foodPerCitizenPerDay",
     "foodPerFarmerPerDay",
+    "millisecondsPerTick",
+    "gridSize",
+    "mapWidth",
+    "mapHeight",
   ];
 
   for (const key of nonNegativeKeys) {
@@ -98,10 +147,11 @@ export function createSimulationConfig(
       throw new RangeError(`${key} cannot be negative`);
     }
   }
-
   if (config.initialFarmers > config.initialPopulation) {
     throw new RangeError("initialFarmers cannot exceed initialPopulation");
   }
-
+  if (config.ticksPerDay <= 0 || !Number.isInteger(config.ticksPerDay)) {
+    throw new RangeError("ticksPerDay must be a positive integer");
+  }
   return config;
 }

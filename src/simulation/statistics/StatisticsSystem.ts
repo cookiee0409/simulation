@@ -20,7 +20,10 @@ export function createDailyStatistics(
   const houseCount = countBuildings(state, "house");
   const warehouseCount = countBuildings(state, "warehouse");
   const housingCapacity = state.buildings
-    .filter((building) => building.type === "house")
+    .filter(
+      (building) =>
+        building.type === "house" && building.constructionProgress >= 100,
+    )
     .reduce((sum, building) => sum + building.capacity, 0);
 
   // 생성 시 동결: 스냅샷이 깊은 복사 없이 불변 참조를 공유할 수 있게 한다.
@@ -62,7 +65,10 @@ function countBuildings(
   state: SimulationState,
   type: "farm" | "house" | "warehouse",
 ): number {
-  return state.buildings.filter((building) => building.type === type).length;
+  return state.buildings.filter(
+    (building) =>
+      building.type === type && building.constructionProgress >= 100,
+  ).length;
 }
 
 function average(values: number[]): number {

@@ -1,0 +1,242 @@
+import { calculateBuildingDemand } from "../city/BuildingDemandSystem";
+import { createBuilding } from "../city/BuildingFactory";
+import type { SimulationConfig } from "../core/SimulationConfig";
+import type { SeededRandom } from "../core/SeededRandom";
+import type {
+  Citizen,
+  SimulationState,
+  VillageTask,
+} from "../types";
+
+export class TaskBoardSystem {
+  update(
+    state: SimulationState,
+    config: SimulationConfig,
+    random: SeededRandom,
+  ): void {
+    this.ensureConstructionSite(state, config, random);
+    const aliveIds = new Set(state.citizens.map((citizen) => citizen.id));
+    const previousAssignments = new Map(
+      state.tasks.map((task) => [
+        task.id,
+        task.assignedCitizenIds.filter((id) => aliveIds.has(id)),
+      ]),
+    );
+    const foodShortage = calculateFoodShortage(state, config);
+    const tasks: VillageTask[] = [];
+
+    for (const farm of state.buildings
+      .filter(
+        (building) =>
+          building.type === "farm" && building.constructionProgress >= 100,
+      )
+      .sort((left, right) => left.id.localeCompare(right.id))) {
+      tasks.push(
+        createTask(
+          `farm-work:${farm.id}`,
+          "farm_work",
+          farm.id,
+          farm.entrance,
+          55 + foodShortage * 0.45,
+          farm.capacity,
+          previousAssignments,
+        ),
+      );
+      const storedFood = farm.inventory.food ?? 0;
+      const previousCarriers =
+        previousAssignments.get(`carry-food:${farm.id}`) ?? [];
+      if (storedFood >= 0.25 || previousCarriers.length > 0) {
+        tasks.push(
+          createTask(
+            `carry-food:${farm.id}`,
+            "carry_food_to_warehouse",
+            farm.id,
+            farm.entrance,
+            50 + Math.min(45, storedFood * 5) + foodShortage * 0.25,
+            Math.max(
+              previousCarriers.length,
+              1,
+              Math.min(5, Math.ceil(storedFood / config.carryCapacity)),
+            ),
+            previousAssignments,
+          ),
+        );
+      }
+    }
+
+    for (const warehouse of state.buildings
+      .filter(
+        (building) =>
+          building.type === "warehouse" &&
+          building.constructionProgress >= 100 &&
+          (building.inventory.food ?? 0) >= config.foodPerMeal,
+      )
+      .sort((left, right) => left.id.localeCompare(right.id))) {
+      tasks.push(
+        createTask(
+          `eat-food:${warehouse.id}`,
+          "eat_food",
+          warehouse.id,
+          warehouse.entrance,
+          75,
+          Math.max(
+            1,
+            Math.floor(
+              (warehouse.inventory.food ?? 0) /
+                Math.max(0.001, config.foodPerMeal),
+            ),
+          ),
+          previousAssignments,
+        ),
+      );
+    }
+
+    for (const house of state.buildings
+      .filter(
+        (building) =>
+          building.type === "house" && building.constructionProgress >= 100,
+      )
+      .sort((left, right) => left.id.localeCompare(right.id))) {
+      tasks.push(
+        createTask(
+          `rest-home:${house.id}`,
+          "rest_at_home",
+          house.id,
+          house.entrance,
+          25,
+          house.capacity,
+          previousAssignments,
+        ),
+      );
+    }
+
+    for (const site of state.buildings
+      .filter(
+        (building) =>
+          building.type === "house" && building.constructionProgress < 100,
+      )
+      .sort((left, right) => left.id.localeCompare(right.id))) {
+      tasks.push(
+        createTask(
+          `build-house:${site.id}`,
+          "build_house",
+          site.id,
+          site.entrance,
+          90,
+          config.buildTaskCapacity,
+          previousAssignments,
+        ),
+      );
+    }
+
+    state.tasks = tasks;
+    this.removeInvalidAssignments(state);
+  }
+
+  assignCitizen(
+    task: VillageTask,
+    citizen: Citizen,
+  ): boolean {
+    if (
+      !task.assignedCitizenIds.includes(citizen.id) &&
+      task.assignedCitizenIds.length >= task.capacity
+    ) {
+      return false;
+    }
+    if (!task.assignedCitizenIds.includes(citizen.id)) {
+      task.assignedCitizenIds.push(citizen.id);
+      task.assignedCitizenIds.sort();
+    }
+    citizen.taskId = task.id;
+    return true;
+  }
+
+  unassignCitizen(state: SimulationState, citizen: Citizen): void {
+    if (citizen.taskId) {
+      const task = state.tasks.find((candidate) => candidate.id === citizen.taskId);
+      if (task) {
+        task.assignedCitizenIds = task.assignedCitizenIds.filter(
+          (id) => id !== citizen.id,
+        );
+      }
+    }
+    citizen.taskId = undefined;
+  }
+
+  private ensureConstructionSite(
+    state: SimulationState,
+    config: SimulationConfig,
+    random: SeededRandom,
+  ): void {
+    const hasSite = state.buildings.some(
+      (building) =>
+        building.type === "house" && building.constructionProgress < 100,
+    );
+    if (hasSite || calculateBuildingDemand(state, config).houses <= 0) {
+      return;
+    }
+    const houseIndex = state.buildings.filter(
+      (building) => building.type === "house",
+    ).length;
+    state.buildings.push(
+      createBuilding(
+        "house",
+        houseIndex,
+        config.houseCapacity,
+        random,
+        config,
+        0,
+      ),
+    );
+    state.mapRevision += 1;
+  }
+
+  private removeInvalidAssignments(state: SimulationState): void {
+    const taskIds = new Set(state.tasks.map((task) => task.id));
+    for (const citizen of state.citizens) {
+      if (citizen.taskId && !taskIds.has(citizen.taskId)) {
+        citizen.taskId = undefined;
+        if (
+          citizen.actionState !== "completed" &&
+          citizen.actionState !== "failed"
+        ) {
+          citizen.actionState = "failed";
+        }
+      }
+    }
+  }
+}
+
+function createTask(
+  id: string,
+  type: VillageTask["type"],
+  targetId: string,
+  targetPosition: VillageTask["targetPosition"],
+  priority: number,
+  capacity: number,
+  previousAssignments: Map<string, string[]>,
+): VillageTask {
+  return {
+    id,
+    type,
+    targetId,
+    targetPosition: { ...targetPosition },
+    priority,
+    capacity,
+    assignedCitizenIds: (previousAssignments.get(id) ?? []).slice(0, capacity),
+  };
+}
+
+export function calculateFoodShortage(
+  state: SimulationState,
+  config: SimulationConfig,
+): number {
+  const totalFood =
+    state.buildings.reduce(
+      (sum, building) => sum + (building.inventory.food ?? 0),
+      0,
+    ) + state.citizens.reduce((sum, citizen) => sum + citizen.carriedFood, 0);
+  const dailyDemand =
+    state.citizens.length * Math.max(0.001, config.foodPerCitizenPerDay);
+  return Math.max(0, Math.min(100, (1 - totalFood / dailyDemand) * 100));
+}

@@ -87,7 +87,13 @@ h1 {
 }
 
 .day-card strong {
+  display: block;
   font-size: 1.45rem;
+}
+
+.day-card small {
+  color: #718077;
+  font-size: 0.68rem;
 }
 
 .dashboard {
@@ -182,6 +188,8 @@ h1 {
 .stats-panel {
   padding: 22px;
   border-radius: 26px;
+  max-height: 590px;
+  overflow-y: auto;
 }
 
 .stats-heading {
@@ -266,6 +274,121 @@ h1 {
 
 .flow-card strong {
   font-size: 0.88rem;
+}
+
+.activity-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.activity-board div {
+  padding: 9px 5px;
+  border-radius: 10px;
+  background: #e8eee3;
+  text-align: center;
+}
+
+.activity-board span {
+  display: block;
+  color: #748177;
+  font-size: 0.58rem;
+}
+
+.activity-board strong {
+  font-size: 0.92rem;
+}
+
+.citizen-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(48, 73, 57, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.empty-selection {
+  color: #76837b;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.citizen-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.citizen-title h3 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.citizen-title > span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #e3ebdc;
+  color: #3c5c45;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.citizen-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.citizen-facts div {
+  min-width: 0;
+  padding: 7px;
+  border-radius: 8px;
+  background: #f1f4ed;
+}
+
+.citizen-facts dt {
+  color: #7b877f;
+  font-size: 0.56rem;
+}
+
+.citizen-facts dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.decision-reasons {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(48, 73, 57, 0.1);
+}
+
+.decision-reasons > b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.68rem;
+}
+
+.decision-reasons div {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  color: #69766e;
+  font-size: 0.64rem;
+}
+
+.decision-reasons .positive {
+  color: #3f754c;
+}
+
+.decision-reasons .negative {
+  color: #a45d4f;
 }
 
 .history {
@@ -362,6 +485,10 @@ h1 {
 
   .controls {
     flex-wrap: wrap;
+  }
+
+  .stats-panel {
+    max-height: none;
   }
 }
 

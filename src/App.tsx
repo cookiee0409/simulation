@@ -3,6 +3,7 @@ import { VillageCanvas } from "./game/VillageCanvas";
 import {
   SIMULATION_SPEEDS,
   SimulationEngine,
+  type Citizen,
   type SimulationSnapshot,
   type SimulationSpeed,
 } from "./simulation";
@@ -10,90 +11,108 @@ import "./styles.css";
 
 const DEFAULT_SEED = "village-001";
 
+const GOAL_LABELS: Record<Citizen["goal"], string> = {
+  eat: "식사",
+  work_farm: "농사",
+  carry_food: "식량 운반",
+  rest: "휴식",
+  return_home: "귀가",
+  seek_work: "일자리 탐색",
+  build: "주택 건설",
+  wander: "주변 살피기",
+};
+
 export default function App() {
   const engineRef = useRef(new SimulationEngine({ seed: DEFAULT_SEED }));
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() =>
     engineRef.current.getSnapshot(),
   );
+  const [selectedCitizenId, setSelectedCitizenId] = useState<string>();
 
   useEffect(() => {
     let frameId = 0;
     let previousTime = performance.now();
-
     const frame = (currentTime: number) => {
       const elapsed = Math.min(250, currentTime - previousTime);
       previousTime = currentTime;
-      const completedDays = engineRef.current.advanceRealTime(elapsed);
-      if (completedDays > 0) {
+      const completedTicks = engineRef.current.advanceRealTime(elapsed);
+      if (completedTicks > 0) {
         setSnapshot(engineRef.current.getSnapshot());
       }
       frameId = requestAnimationFrame(frame);
     };
-
     frameId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  const updateSnapshot = () => {
-    setSnapshot(engineRef.current.getSnapshot());
-  };
-
+  const refresh = () => setSnapshot(engineRef.current.getSnapshot());
   const togglePaused = () => {
     engineRef.current.setPaused(!snapshot.paused);
-    updateSnapshot();
+    refresh();
   };
-
   const setSpeed = (speed: SimulationSpeed) => {
     engineRef.current.setSpeed(speed);
-    updateSnapshot();
+    refresh();
   };
-
+  const stepOneTick = () => {
+    engineRef.current.stepTick();
+    refresh();
+  };
   const stepOneDay = () => {
     engineRef.current.stepDay();
-    updateSnapshot();
+    refresh();
   };
-
   const resetSimulation = () => {
     engineRef.current = new SimulationEngine({ seed: DEFAULT_SEED });
-    updateSnapshot();
+    setSelectedCitizenId(undefined);
+    refresh();
   };
 
   const stats = snapshot.latestStatistics;
-  const recentStatistics = snapshot.recentStatistics.slice(-7).reverse();
+  const selectedCitizen = snapshot.citizens.find(
+    (citizen) => citizen.id === selectedCitizenId,
+  );
+  const recentStatistics = snapshot.recentStatistics.slice(-5).reverse();
 
   return (
     <main className="app-shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">SOCIAL VILLAGE LAB · SEED {snapshot.seed}</p>
-          <h1>작은 사회 실험실</h1>
+          <p className="eyebrow">AUTONOMOUS VILLAGE · SEED {snapshot.seed}</p>
+          <h1>움직이는 작은 사회</h1>
           <p className="subtitle">
-            100명의 주민, 한정된 식량, 그리고 스스로 균형을 찾는 마을.
+            주민들은 마을의 필요와 자신의 상태를 살펴보고 목적지를 선택합니다.
           </p>
         </div>
         <div className="day-card">
-          <span>현재 날짜</span>
+          <span>시뮬레이션 시간</span>
           <strong>DAY {snapshot.day}</strong>
+          <small>{formatClock(snapshot.minuteOfDay)} · TICK {snapshot.tickInDay}</small>
         </div>
       </header>
 
       <section className="dashboard">
         <div className="village-panel">
-          <VillageCanvas snapshot={snapshot} />
+          <VillageCanvas
+            snapshot={snapshot}
+            selectedCitizenId={selectedCitizenId}
+            onCitizenSelect={setSelectedCitizenId}
+          />
           <div className="legend" aria-label="지도 범례">
-            <span><i className="dot farmer" /> 농부</span>
-            <span><i className="dot citizen" /> 무직 주민</span>
-            <span><i className="block farm" /> 농장</span>
-            <span><i className="block house" /> 주택</span>
-            <span><i className="block warehouse" /> 창고</span>
+            <span>🌾 농사</span>
+            <span>🍞 식사</span>
+            <span>📦 운반</span>
+            <span>🔨 건설</span>
+            <span>💤 휴식</span>
+            <span>흰 점: 건물 입구</span>
           </div>
         </div>
 
         <aside className="stats-panel">
           <div className="stats-heading">
             <div>
-              <p className="eyebrow">DAILY SNAPSHOT</p>
-              <h2>마을 현황</h2>
+              <p className="eyebrow">LIVE AGENT STATE</p>
+              <h2>마을 관찰판</h2>
             </div>
             <span className={snapshot.paused ? "status paused" : "status"}>
               {snapshot.paused ? "일시정지" : `${snapshot.speed}배속 실행 중`}
@@ -102,39 +121,31 @@ export default function App() {
 
           <div className="metric-grid">
             <Metric label="인구" value={`${stats.population}명`} />
-            <Metric label="식량 재고" value={format(stats.foodStock)} />
-            <Metric
-              label="평균 행복도"
-              value={`${format(stats.averageHappiness)}점`}
-            />
+            <Metric label="창고 식량" value={format(stats.foodStock)} />
+            <Metric label="평균 행복도" value={`${format(stats.averageHappiness)}점`} />
             <Metric label="농부" value={`${stats.farmerCount}명`} />
-            <Metric label="농장" value={`${stats.farmCount}개`} />
+            <Metric label="완공 주택" value={`${stats.houseCount}채`} />
             <Metric
               label="주택 수요"
-              value={`${stats.housingDemand}개`}
+              value={`${stats.housingDemand}채`}
               warning={stats.housingDemand > 0}
             />
           </div>
 
-          <div className="flow-card">
-            <div>
-              <span>오늘 생산</span>
-              <strong>+{format(stats.foodProduced)}</strong>
+          <ActivityBoard snapshot={snapshot} />
+
+          {selectedCitizen ? (
+            <CitizenPanel citizen={selectedCitizen} />
+          ) : (
+            <div className="citizen-panel empty-selection">
+              지도에서 주민을 클릭하면 목표, 경로와 판단 이유를 볼 수 있습니다.
             </div>
-            <div>
-              <span>오늘 소비</span>
-              <strong>-{format(stats.foodConsumed)}</strong>
-            </div>
-            <div>
-              <span>미충족 수요</span>
-              <strong>{format(stats.unmetFoodDemand)}</strong>
-            </div>
-          </div>
+          )}
 
           <div className="history">
             <h3>최근 일일 기록</h3>
             {recentStatistics.length === 0 ? (
-              <p className="empty">하루를 진행하면 통계가 기록됩니다.</p>
+              <p className="empty">첫날이 끝나면 통계가 기록됩니다.</p>
             ) : (
               <div className="history-list">
                 {recentStatistics.map((entry) => (
@@ -142,7 +153,7 @@ export default function App() {
                     <b>D{entry.day}</b>
                     <span>인구 {entry.population}</span>
                     <span>식량 {format(entry.foodStock)}</span>
-                    <span>행복 {format(entry.averageHappiness)}</span>
+                    <span>생산 {format(entry.foodProduced)}</span>
                   </div>
                 ))}
               </div>
@@ -167,6 +178,7 @@ export default function App() {
             </button>
           ))}
         </div>
+        <button type="button" onClick={stepOneTick}>+ 10분</button>
         <button type="button" onClick={stepOneDay}>+ 하루</button>
         <button type="button" onClick={resetSimulation}>같은 시드로 초기화</button>
       </section>
@@ -174,19 +186,85 @@ export default function App() {
   );
 }
 
-interface MetricProps {
+function ActivityBoard({ snapshot }: { snapshot: SimulationSnapshot }) {
+  const items = [
+    ["이동 중", snapshot.activitySummary.moving],
+    ["농사 중", snapshot.activitySummary.farming],
+    ["식사 중", snapshot.activitySummary.eating],
+    ["운반 중", snapshot.activitySummary.carrying],
+    ["건설 중", snapshot.activitySummary.building],
+    ["휴식 중", snapshot.activitySummary.resting],
+    ["대기 중", snapshot.activitySummary.waiting],
+  ];
+  return (
+    <div className="activity-board">
+      {items.map(([label, value]) => (
+        <div key={label}>
+          <span>{label}</span>
+          <strong>{value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CitizenPanel({ citizen }: { citizen: Citizen }) {
+  return (
+    <section className="citizen-panel">
+      <div className="citizen-title">
+        <div>
+          <p className="eyebrow">SELECTED CITIZEN</p>
+          <h3>{citizen.id}</h3>
+        </div>
+        <span>{citizen.job === "farmer" ? "농부" : "무직"}</span>
+      </div>
+      <dl className="citizen-facts">
+        <div><dt>현재 목표</dt><dd>{GOAL_LABELS[citizen.goal]}</dd></div>
+        <div><dt>행동 상태</dt><dd>{citizen.actionState}</dd></div>
+        <div><dt>목적지</dt><dd>{citizen.targetId ?? "없음"}</dd></div>
+        <div><dt>진행률</dt><dd>{Math.round(citizen.actionProgress * 100)}%</dd></div>
+        <div><dt>배고픔</dt><dd>{format(citizen.hunger)}</dd></div>
+        <div><dt>피로</dt><dd>{format(citizen.fatigue)}</dd></div>
+        <div><dt>건강</dt><dd>{format(citizen.health)}</dd></div>
+        <div><dt>행복도</dt><dd>{format(citizen.happiness)}</dd></div>
+        <div><dt>보유 식량</dt><dd>{format(citizen.carriedFood)}</dd></div>
+      </dl>
+      <div className="decision-reasons">
+        <b>행동 선택 이유 · 최종 {format(citizen.decisionScore)}</b>
+        {citizen.decisionReasons.map((reason) => (
+          <div key={`${reason.factor}-${reason.score}`}>
+            <span>{reason.factor}</span>
+            <strong className={reason.score >= 0 ? "positive" : "negative"}>
+              {reason.score >= 0 ? "+" : ""}{format(reason.score)}
+            </strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  warning = false,
+}: {
   label: string;
   value: string;
   warning?: boolean;
-}
-
-function Metric({ label, value, warning = false }: MetricProps) {
+}) {
   return (
     <div className={warning ? "metric warning" : "metric"}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
   );
+}
+
+function formatClock(minutes: number): string {
+  const hours = Math.floor(minutes / 60) % 24;
+  const remainder = minutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
 function format(value: number): string {

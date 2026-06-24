@@ -18,7 +18,10 @@ export function adjustFarmWorkforce(
     (citizen) => citizen.job === "farmer",
   ).length;
   const farmCapacity = state.buildings
-    .filter((building) => building.type === "farm")
+    .filter(
+      (building) =>
+        building.type === "farm" && building.constructionProgress >= 100,
+    )
     .reduce((sum, building) => sum + building.capacity, 0);
   const transfersNeeded = Math.min(
     config.maxFarmerTransfersPerDay,
@@ -49,7 +52,8 @@ export function adjustFarmWorkforce(
  */
 export function assignWorkersToFarms(state: SimulationState): void {
   const farms = state.buildings.filter(
-    (building): building is Building => building.type === "farm",
+    (building): building is Building =>
+      building.type === "farm" && building.constructionProgress >= 100,
   );
   for (const farm of farms) {
     farm.workers = [];

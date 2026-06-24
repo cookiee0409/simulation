@@ -23,6 +23,7 @@ const reproducibilityCheckElapsedMilliseconds =
 const report = {
   seed: engine.config.seed,
   daysRun: final.day,
+  ticksRun: engine.getSnapshot().tick,
   simulationElapsedMilliseconds: round(simulationElapsedMilliseconds),
   reproducibilityCheckElapsedMilliseconds: round(
     reproducibilityCheckElapsedMilliseconds,
@@ -62,6 +63,11 @@ const report = {
     ),
     snapshots: statistics.length,
   },
+  agents: {
+    activitiesAtEnd: engine.getSnapshot().activitySummary,
+    activeTasks: engine.getSnapshot().tasks.length,
+  },
+  pathfinding: engine.getSnapshot().pathfinding,
 };
 
 console.log(JSON.stringify(report, null, 2));

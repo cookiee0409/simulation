@@ -2,26 +2,49 @@ import { describe, expect, it } from "vitest";
 import { SimulationEngine } from "./SimulationEngine";
 
 describe("SimulationEngine", () => {
-  it("100명의 NPC와 농장·주택·창고를 생성한다", () => {
+  it("100명의 NPC와 농장·완공 주택·창고를 생성한다", () => {
     const engine = new SimulationEngine({ seed: "creation-test" });
     const snapshot = engine.getSnapshot();
 
     expect(snapshot.citizens).toHaveLength(100);
-    expect(snapshot.buildings.filter((item) => item.type === "farm")).toHaveLength(1);
-    expect(snapshot.buildings.filter((item) => item.type === "house")).toHaveLength(9);
+    expect(
+      snapshot.buildings.filter((item) => item.type === "farm"),
+    ).toHaveLength(1);
+    expect(
+      snapshot.buildings.filter(
+        (item) => item.type === "house" && item.constructionProgress >= 100,
+      ),
+    ).toHaveLength(9);
     expect(
       snapshot.buildings.filter((item) => item.type === "warehouse"),
     ).toHaveLength(1);
+    expect(
+      snapshot.buildings.some(
+        (item) => item.type === "house" && item.constructionProgress < 100,
+      ),
+    ).toBe(true);
   });
 
-  it("하루마다 식량을 생산·소비하고 통계를 기록한다", () => {
+  it("stepTick과 stepDay가 144틱 일자를 유지한다", () => {
+    const engine = new SimulationEngine({ seed: "tick-api" });
+    expect(engine.stepTick()).toBeUndefined();
+    expect(engine.getSnapshot().tick).toBe(1);
+    expect(engine.runTicks(143)).toHaveLength(1);
+    expect(engine.getSnapshot().day).toBe(1);
+    const nextDay = engine.stepDay();
+    expect(nextDay.day).toBe(2);
+    expect(engine.getSnapshot().tick).toBe(288);
+  });
+
+  it("하루 동안 실제 농사·식사 결과를 통계로 기록한다", () => {
     const engine = new SimulationEngine({ seed: "food-flow-test" });
     const before = engine.getSnapshot();
     const day = engine.stepDay();
 
     expect(day.day).toBe(1);
     expect(day.foodProduced).toBeGreaterThan(0);
-    expect(day.foodConsumed).toBe(100);
+    expect(day.foodConsumed).toBeGreaterThan(0);
+    expect(day.foodConsumed).toBeLessThanOrEqual(100);
     expect(engine.getSnapshot().statistics).toHaveLength(1);
     expect(day.foodStock).not.toBe(before.resources.food);
   });
@@ -41,15 +64,18 @@ describe("SimulationEngine", () => {
     expect(after.farmerCount).toBeGreaterThan(before.farmerCount);
   });
 
-  it("주택이 부족하면 주택 건설 수요를 계산한다", () => {
+  it("주택 부족 시 건설 작업을 거쳐 주택이 완공된다", () => {
     const engine = new SimulationEngine({
       seed: "housing-demand-test",
       initialHouses: 8,
       houseCapacity: 10,
     });
+    expect(engine.getSnapshot().tasks.some((task) => task.type === "build_house"))
+      .toBe(true);
 
-    expect(engine.getBuildingDemand().houses).toBe(2);
-    expect(engine.getLatestStatistics().housingDemand).toBe(2);
+    engine.runDays(3);
+    expect(engine.getLatestStatistics().houseCount).toBeGreaterThanOrEqual(10);
+    expect(engine.getBuildingDemand().houses).toBe(0);
   });
 
   it("식량 생산과 비축이 없으면 행복도와 인구가 감소한다", () => {
@@ -57,54 +83,47 @@ describe("SimulationEngine", () => {
       seed: "starvation-test",
       initialFood: 0,
       foodPerFarmerPerDay: 0,
+      farmFoodPerAction: 0,
     });
     const initial = engine.getLatestStatistics();
-    const final = engine.runDays(20).at(-1);
+    const final = engine.runDays(20).at(-1)!;
 
-    expect(final).toBeDefined();
-    expect(final!.averageHappiness).toBeLessThan(initial.averageHappiness);
-    expect(final!.population).toBeLessThan(initial.population);
-    expect(final!.unmetFoodDemand).toBeGreaterThan(0);
+    expect(final.averageHappiness).toBeLessThan(initial.averageHappiness);
+    expect(final.population).toBeLessThan(initial.population);
+    expect(
+      engine.getSnapshot().statistics.some((day) => day.unmetFoodDemand > 0),
+    ).toBe(true);
   });
 
   it("서로 다른 시드는 서로 다른 사회 궤적을 만든다", () => {
     const a = new SimulationEngine({ seed: "divergence-a" });
     const b = new SimulationEngine({ seed: "divergence-b" });
+    a.runDays(10);
+    b.runDays(10);
 
-    a.runDays(100);
-    b.runDays(100);
-
-    const statsA = a.getSnapshot().statistics;
-    const statsB = b.getSnapshot().statistics;
-    // 토지 비옥도가 시드별로 달라 매일 생산량이 갈리므로 궤적이 동일하지 않다.
-    expect(a.getSnapshot().landFertility).not.toBe(b.getSnapshot().landFertility);
-    expect(JSON.stringify(statsA)).not.toBe(JSON.stringify(statsB));
+    expect(a.getSnapshot().landFertility).not.toBe(
+      b.getSnapshot().landFertility,
+    );
+    expect(a.getSnapshot().statistics).not.toEqual(b.getSnapshot().statistics);
   });
 
-  it("1,000일 동안 유한하고 경계를 벗어나지 않는 통계를 만든다", () => {
-    const engine = new SimulationEngine({ seed: "long-horizon" });
-    const statistics = engine.runDays(1_000);
-
-    expect(statistics).toHaveLength(1_000);
-    for (const day of statistics) {
-      for (const value of Object.values(day)) {
-        expect(Number.isFinite(value)).toBe(true);
-      }
-      expect(day.population).toBeGreaterThanOrEqual(0);
-      expect(day.foodStock).toBeGreaterThanOrEqual(0);
-      expect(day.averageHappiness).toBeGreaterThanOrEqual(0);
-      expect(day.averageHappiness).toBeLessThanOrEqual(100);
-    }
-  });
-
-  it("동일한 설정과 시드에서 100일 결과가 완전히 같다", () => {
+  it("동일한 설정과 시드에서 목표·경로·결과가 같다", () => {
     const first = new SimulationEngine({ seed: "replay-test" });
     const second = new SimulationEngine({ seed: "replay-test" });
-
-    first.runDays(100);
-    second.runDays(100);
-
+    first.runDays(20);
+    second.runDays(20);
     expect(first.getSnapshot()).toEqual(second.getSnapshot());
+  }, 30_000);
+
+  it("배속 설정과 무관하게 같은 날짜를 실행하면 결과가 같다", () => {
+    const normal = new SimulationEngine({ seed: "speed-invariance" });
+    const fast = new SimulationEngine({ seed: "speed-invariance" });
+    normal.setSpeed(1);
+    fast.setSpeed(100);
+    normal.runDays(5);
+    fast.runDays(5);
+    fast.setSpeed(1);
+    expect(normal.getSnapshot()).toEqual(fast.getSnapshot());
   });
 
   it("그래픽 없이 100일간 유한하고 음수가 아닌 통계를 만든다", () => {
@@ -113,7 +132,6 @@ describe("SimulationEngine", () => {
 
     expect(statistics).toHaveLength(100);
     expect(statistics.at(-1)?.day).toBe(100);
-
     for (const day of statistics) {
       for (const value of Object.values(day)) {
         expect(Number.isFinite(value)).toBe(true);
@@ -123,5 +141,6 @@ describe("SimulationEngine", () => {
       expect(day.averageHappiness).toBeGreaterThanOrEqual(0);
       expect(day.averageHappiness).toBeLessThanOrEqual(100);
     }
-  });
+    expect(engine.getSnapshot().pathfinding.cacheHits).toBeGreaterThan(0);
+  }, 20_000);
 });

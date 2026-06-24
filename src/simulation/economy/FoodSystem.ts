@@ -9,60 +9,21 @@ export interface FoodDayResult {
   populationLost: number;
 }
 
+/**
+ * 틱 시스템이 기록한 실제 생산·식사량을 하루 단위 건강/행복/이탈 효과로 정산한다.
+ * 생산과 소비 자체는 AgentExecutionSystem에서만 일어나므로 자원 중복 생성이 없다.
+ */
 export function processFoodDay(
   state: SimulationState,
   config: SimulationConfig,
   random: SeededRandom,
 ): FoodDayResult {
-  const farmers = state.citizens.filter(
-    (citizen) => citizen.job === "farmer" && citizen.canWork,
-  );
-  const productivityFactor =
-    farmers.length === 0
-      ? 0
-      : farmers.reduce(
-          (sum, citizen) =>
-            sum +
-            Math.max(
-              config.farmerHealthProductivityFloor,
-              citizen.health / 100,
-            ),
-          0,
-        ) / farmers.length;
-
-  // 농장이 실제 생산을 좌우한다: 농장 총정원을 넘는 농부는 생산에 기여하지 못한다.
-  const totalFarmCapacity = state.buildings
-    .filter((building) => building.type === "farm")
-    .reduce((sum, building) => sum + building.capacity, 0);
-  const productiveFarmers = Math.min(farmers.length, totalFarmCapacity);
-
-  // 매일 ±dailyProductionNoise 비율의 확률 요동(시드 기반, 음수는 0으로 보정).
-  const noiseFactor = Math.max(
-    0,
-    1 + random.between(-config.dailyProductionNoise, config.dailyProductionNoise),
-  );
-  const produced =
-    productiveFarmers *
-    config.foodPerFarmerPerDay *
-    productivityFactor *
-    noiseFactor;
-  const storageCapacity = state.buildings
-    .filter((building) => building.type === "warehouse")
-    .reduce((sum, building) => sum + building.capacity, 0);
-
-  state.resources.food = Math.min(
-    storageCapacity,
-    state.resources.food + produced,
-  );
-
-  const required =
-    state.citizens.length * config.foodPerCitizenPerDay;
-  const consumed = Math.min(required, state.resources.food);
-  const satisfaction = required === 0 ? 1 : consumed / required;
-  state.resources.food = Math.max(0, state.resources.food - consumed);
+  const required = state.citizens.length * config.foodPerCitizenPerDay;
+  const consumed = state.dailyMetrics.foodConsumed;
+  const satisfaction = required === 0 ? 1 : Math.min(1, consumed / required);
 
   for (const citizen of state.citizens) {
-    updateCitizenNeeds(citizen, satisfaction, config);
+    updateCitizenWellbeing(citizen, satisfaction, config);
   }
 
   const survivors: Citizen[] = [];
@@ -76,32 +37,31 @@ export function processFoodDay(
     }
   }
   state.citizens = survivors;
+  state.dailyMetrics.populationLost += populationLost;
 
   return {
-    produced,
+    produced: state.dailyMetrics.foodProduced,
     consumed,
     unmetDemand: Math.max(0, required - consumed),
-    populationLost,
+    populationLost: state.dailyMetrics.populationLost,
   };
 }
 
-function updateCitizenNeeds(
+export function synchronizeVillageFood(state: SimulationState): void {
+  state.resources.food = state.buildings
+    .filter(
+      (building) =>
+        building.type === "warehouse" &&
+        building.constructionProgress >= 100,
+    )
+    .reduce((sum, building) => sum + (building.inventory.food ?? 0), 0);
+}
+
+function updateCitizenWellbeing(
   citizen: Citizen,
   foodSatisfaction: number,
   config: SimulationConfig,
 ): void {
-  if (foodSatisfaction >= 0.999) {
-    citizen.hunger = Math.max(0, citizen.hunger - config.hungerRecoveryPerDay);
-    citizen.action = citizen.job === "farmer" ? "working" : "eating";
-  } else {
-    citizen.hunger = Math.min(
-      100,
-      citizen.hunger +
-        (1 - foodSatisfaction) * config.hungerGainAtZeroFood,
-    );
-    citizen.action = "idle";
-  }
-
   if (citizen.hunger > config.hungerHealthThreshold) {
     citizen.health = Math.max(
       0,
@@ -143,7 +103,6 @@ function shouldLeaveFromHunger(
   if (citizen.hunger < config.severeHungerThreshold) {
     return false;
   }
-
   const severity =
     (citizen.hunger - config.severeHungerThreshold) /
     Math.max(1, 100 - config.severeHungerThreshold);

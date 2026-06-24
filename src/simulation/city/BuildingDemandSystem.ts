@@ -13,10 +13,12 @@ export function calculateBuildingDemand(
   config: SimulationConfig,
 ): BuildingDemand {
   const farmCount = state.buildings.filter(
-    (building) => building.type === "farm",
+    (building) =>
+      building.type === "farm" && building.constructionProgress >= 100,
   ).length;
   const houseCount = state.buildings.filter(
-    (building) => building.type === "house",
+    (building) =>
+      building.type === "house" && building.constructionProgress >= 100,
   ).length;
   const desiredFarmers =
     config.foodPerFarmerPerDay <= 0
@@ -52,7 +54,14 @@ export function buildOneNeededFarm(
     (building) => building.type === "farm",
   ).length;
   state.buildings.push(
-    createBuilding("farm", farmIndex, config.farmWorkerCapacity, random),
+    createBuilding(
+      "farm",
+      farmIndex,
+      config.farmWorkerCapacity,
+      random,
+      config,
+    ),
   );
+  state.mapRevision += 1;
   return true;
 }
