@@ -19,6 +19,12 @@ export class AgentExecutionSystem {
       case "work_farm":
         this.performFarmWork(citizen, state, config, random);
         break;
+      case "gather_wood":
+        this.performGather(citizen, state, config, "wood", random);
+        break;
+      case "gather_stone":
+        this.performGather(citizen, state, config, "stone", random);
+        break;
       case "carry_food":
         this.performCarry(citizen, state, config);
         break;
@@ -83,6 +89,55 @@ export class AgentExecutionSystem {
       );
     farm.inventory.food = (farm.inventory.food ?? 0) + amount;
     state.dailyMetrics.foodProduced += amount;
+    complete(citizen);
+  }
+
+  private performGather(
+    citizen: Citizen,
+    state: SimulationState,
+    config: SimulationConfig,
+    resource: "wood" | "stone",
+    random?: SeededRandom,
+  ): void {
+    const buildingType = resource === "wood" ? "lumberjack" : "quarry";
+    const requiredJob = resource === "wood" ? "lumberjack" : "miner";
+    const site = state.buildings.find(
+      (building) =>
+        building.id === citizen.targetId &&
+        building.type === buildingType &&
+        building.constructionProgress >= 100,
+    );
+    if (!site || citizen.job !== requiredJob || !citizen.canWork) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += 1 / config.gatherActionTicks;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    const yieldPerAction =
+      resource === "wood" ? config.woodPerAction : config.stonePerAction;
+    const productivity = Math.max(
+      config.farmerHealthProductivityFloor,
+      citizen.health / 100,
+    );
+    const amount =
+      yieldPerAction *
+      productivity *
+      Math.max(
+        0,
+        1 +
+          (random?.between(
+            -config.dailyProductionNoise,
+            config.dailyProductionNoise,
+          ) ?? 0),
+      );
+    const target =
+      resource === "wood" ? config.woodStockTarget : config.stoneStockTarget;
+    state.resources[resource] = Math.min(
+      target,
+      state.resources[resource] + amount,
+    );
     complete(citizen);
   }
 
@@ -284,6 +339,8 @@ function updateLegacyAction(citizen: Citizen): void {
     citizen.action = "eating";
   } else if (
     citizen.goal === "work_farm" ||
+    citizen.goal === "gather_wood" ||
+    citizen.goal === "gather_stone" ||
     citizen.goal === "build" ||
     citizen.goal === "carry_food"
   ) {

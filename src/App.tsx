@@ -14,12 +14,21 @@ const DEFAULT_SEED = "village-001";
 const GOAL_LABELS: Record<Citizen["goal"], string> = {
   eat: "식사",
   work_farm: "농사",
+  gather_wood: "벌목",
+  gather_stone: "채석",
   carry_food: "식량 운반",
   rest: "휴식",
   return_home: "귀가",
   seek_work: "일자리 탐색",
   build: "주택 건설",
   wander: "주변 살피기",
+};
+
+const JOB_LABELS: Record<Citizen["job"], string> = {
+  farmer: "농부",
+  lumberjack: "벌목공",
+  miner: "채석공",
+  unemployed: "무직",
 };
 
 export default function App() {
@@ -122,8 +131,13 @@ export default function App() {
           <div className="metric-grid">
             <Metric label="인구" value={`${stats.population}명`} />
             <Metric label="창고 식량" value={format(stats.foodStock)} />
+            <Metric label="나무" value={format(stats.woodStock)} />
+            <Metric label="돌" value={format(stats.stoneStock)} />
             <Metric label="평균 행복도" value={`${format(stats.averageHappiness)}점`} />
-            <Metric label="농부" value={`${stats.farmerCount}명`} />
+            <Metric
+              label="농부·벌목·채석"
+              value={`${stats.farmerCount}·${stats.lumberjackCount}·${stats.minerCount}`}
+            />
             <Metric label="완공 주택" value={`${stats.houseCount}채`} />
             <Metric
               label="주택 수요"
@@ -216,7 +230,7 @@ function CitizenPanel({ citizen }: { citizen: Citizen }) {
           <p className="eyebrow">SELECTED CITIZEN</p>
           <h3>{citizen.id}</h3>
         </div>
-        <span>{citizen.job === "farmer" ? "농부" : "무직"}</span>
+        <span>{JOB_LABELS[citizen.job]}</span>
       </div>
       <dl className="citizen-facts">
         <div><dt>현재 목표</dt><dd>{GOAL_LABELS[citizen.goal]}</dd></div>

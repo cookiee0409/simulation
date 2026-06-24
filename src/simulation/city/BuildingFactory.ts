@@ -27,6 +27,16 @@ const BUILDING_POSITIONS: Record<BuildingType, GridPosition[]> = {
     { x: 660, y: 180 },
     { x: 660, y: 260 },
   ],
+  lumberjack: [
+    { x: 120, y: 450 },
+    { x: 240, y: 450 },
+    { x: 360, y: 450 },
+  ],
+  quarry: [
+    { x: 540, y: 450 },
+    { x: 640, y: 450 },
+    { x: 440, y: 450 },
+  ],
 };
 
 export function createInitialBuildings(
@@ -50,6 +60,29 @@ export function createInitialBuildings(
         "warehouse",
         index,
         config.warehouseCapacity,
+        random,
+        config,
+      ),
+    );
+  }
+
+  for (let index = 0; index < config.initialLumberyards; index += 1) {
+    buildings.push(
+      createBuilding(
+        "lumberjack",
+        index,
+        config.lumberjackWorkerCapacity,
+        random,
+        config,
+      ),
+    );
+  }
+  for (let index = 0; index < config.initialQuarries; index += 1) {
+    buildings.push(
+      createBuilding(
+        "quarry",
+        index,
+        config.quarryWorkerCapacity,
         random,
         config,
       ),
@@ -110,6 +143,9 @@ export function getBuildingHalfSize(
     return { x: gridSize * 2.5, y: gridSize * 1.5 };
   }
   if (type === "warehouse") {
+    return { x: gridSize * 2, y: gridSize * 1.5 };
+  }
+  if (type === "lumberjack" || type === "quarry") {
     return { x: gridSize * 2, y: gridSize * 1.5 };
   }
   return { x: gridSize * 1.5, y: gridSize };

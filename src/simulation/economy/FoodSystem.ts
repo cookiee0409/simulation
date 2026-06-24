@@ -77,9 +77,9 @@ function updateCitizenWellbeing(
   const hungerPenalty = citizen.hunger * config.happinessHungerPenaltyWeight;
   const healthEffect = citizen.health * config.happinessHealthWeight;
   const employmentEffect =
-    citizen.job === "farmer"
-      ? config.happinessEmployedBonus
-      : config.happinessUnemployedPenalty;
+    citizen.job === "unemployed"
+      ? config.happinessUnemployedPenalty
+      : config.happinessEmployedBonus;
   citizen.happiness = clamp(
     config.happinessBase +
       foodEffect +

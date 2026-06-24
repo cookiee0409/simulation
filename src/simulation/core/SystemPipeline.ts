@@ -5,6 +5,7 @@ import {
   type FoodDayResult,
 } from "../economy/FoodSystem";
 import { buildOneNeededFarm } from "../city/BuildingDemandSystem";
+import { adjustResourceWorkforce } from "../economy/ResourceSystem";
 import {
   adjustFarmWorkforce,
   assignWorkersToFarms,
@@ -51,6 +52,12 @@ export function createDefaultSystems(): SimulationSystem[] {
       name: "workforce",
       update(context) {
         adjustFarmWorkforce(context.state, context.config);
+      },
+    },
+    {
+      name: "resource-workforce",
+      update(context) {
+        adjustResourceWorkforce(context.state, context.config);
       },
     },
     {

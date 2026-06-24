@@ -14,6 +14,10 @@ const COLORS = {
   house: 0xf4ddaa,
   roof: 0xc8664b,
   warehouse: 0x8193a6,
+  lumberjack: 0x6b4b2f,
+  lumberjackRoof: 0x3f7d4a,
+  quarry: 0x8a8f99,
+  quarryRock: 0x5d626b,
 };
 
 export class VillageScene extends Phaser.Scene {
@@ -185,6 +189,38 @@ export class VillageScene extends Phaser.Scene {
           `건설 ${Math.round(building.constructionProgress)}%`,
         );
       }
+    } else if (building.type === "lumberjack") {
+      this.buildings.fillStyle(COLORS.lumberjack, alpha);
+      this.buildings.fillRoundedRect(
+        building.position.x - 36,
+        building.position.y - 22,
+        72,
+        44,
+        5,
+      );
+      this.buildings.fillStyle(COLORS.lumberjackRoof, alpha);
+      this.buildings.fillTriangle(
+        building.position.x - 40,
+        building.position.y - 18,
+        building.position.x + 40,
+        building.position.y - 18,
+        building.position.x,
+        building.position.y - 44,
+      );
+      this.addBuildingLabel(building, "벌목장");
+    } else if (building.type === "quarry") {
+      this.buildings.fillStyle(COLORS.quarry, alpha);
+      this.buildings.fillRoundedRect(
+        building.position.x - 36,
+        building.position.y - 22,
+        72,
+        44,
+        5,
+      );
+      this.buildings.fillStyle(COLORS.quarryRock, alpha);
+      this.buildings.fillCircle(building.position.x - 14, building.position.y + 4, 9);
+      this.buildings.fillCircle(building.position.x + 10, building.position.y - 2, 11);
+      this.addBuildingLabel(building, "채석장");
     } else {
       this.buildings.fillStyle(COLORS.warehouse, alpha);
       this.buildings.fillRoundedRect(

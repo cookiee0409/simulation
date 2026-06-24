@@ -3,12 +3,18 @@ export interface GridPosition {
   y: number;
 }
 
-export type CitizenJob = "farmer" | "unemployed";
+export type CitizenJob =
+  | "farmer"
+  | "lumberjack"
+  | "miner"
+  | "unemployed";
 export type CitizenAction = "working" | "eating" | "idle" | "leaving";
 
 export type CitizenGoal =
   | "eat"
   | "work_farm"
+  | "gather_wood"
+  | "gather_stone"
   | "carry_food"
   | "rest"
   | "return_home"
@@ -66,7 +72,12 @@ export interface Citizen {
   lastMealDay: number;
 }
 
-export type BuildingType = "farm" | "house" | "warehouse";
+export type BuildingType =
+  | "farm"
+  | "house"
+  | "warehouse"
+  | "lumberjack"
+  | "quarry";
 export type ResourceType = "food" | "wood" | "stone" | "money";
 export type ResourcePool = Record<ResourceType, number>;
 export type ResourceInventory = Partial<ResourcePool>;
@@ -95,6 +106,8 @@ export type VillageResources = ResourcePool;
 
 export type VillageTaskType =
   | "farm_work"
+  | "gather_wood"
+  | "gather_stone"
   | "carry_food_to_warehouse"
   | "eat_food"
   | "rest_at_home"
@@ -120,16 +133,22 @@ export interface DailyStatistics {
   day: number;
   population: number;
   foodStock: number;
+  woodStock: number;
+  stoneStock: number;
   foodProduced: number;
   foodConsumed: number;
   unmetFoodDemand: number;
   averageHunger: number;
   averageHappiness: number;
   farmerCount: number;
+  lumberjackCount: number;
+  minerCount: number;
   unemployedCount: number;
   farmCount: number;
   houseCount: number;
   warehouseCount: number;
+  lumberjackBuildingCount: number;
+  quarryCount: number;
   housingCapacity: number;
   housingDemand: number;
   populationLost: number;

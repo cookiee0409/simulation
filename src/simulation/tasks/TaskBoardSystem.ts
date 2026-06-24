@@ -64,6 +64,50 @@ export class TaskBoardSystem {
       }
     }
 
+    if (state.resources.wood < config.woodStockTarget) {
+      for (const lumberyard of state.buildings
+        .filter(
+          (building) =>
+            building.type === "lumberjack" &&
+            building.constructionProgress >= 100,
+        )
+        .sort((left, right) => left.id.localeCompare(right.id))) {
+        tasks.push(
+          createTask(
+            `gather-wood:${lumberyard.id}`,
+            "gather_wood",
+            lumberyard.id,
+            lumberyard.entrance,
+            52,
+            lumberyard.capacity,
+            previousAssignments,
+          ),
+        );
+      }
+    }
+
+    if (state.resources.stone < config.stoneStockTarget) {
+      for (const quarry of state.buildings
+        .filter(
+          (building) =>
+            building.type === "quarry" &&
+            building.constructionProgress >= 100,
+        )
+        .sort((left, right) => left.id.localeCompare(right.id))) {
+        tasks.push(
+          createTask(
+            `gather-stone:${quarry.id}`,
+            "gather_stone",
+            quarry.id,
+            quarry.entrance,
+            50,
+            quarry.capacity,
+            previousAssignments,
+          ),
+        );
+      }
+    }
+
     for (const warehouse of state.buildings
       .filter(
         (building) =>
@@ -175,6 +219,16 @@ export class TaskBoardSystem {
     if (hasSite || calculateBuildingDemand(state, config).houses <= 0) {
       return;
     }
+    // 주택 착공은 마을 비축 나무·돌을 소비한다. 자원이 모자라면 채집을
+    // 기다리며 착공을 미룬다(생산 체인이 마을 확장을 제약한다).
+    if (
+      state.resources.wood < config.houseWoodCost ||
+      state.resources.stone < config.houseStoneCost
+    ) {
+      return;
+    }
+    state.resources.wood -= config.houseWoodCost;
+    state.resources.stone -= config.houseStoneCost;
     const houseIndex = state.buildings.filter(
       (building) => building.type === "house",
     ).length;

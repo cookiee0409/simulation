@@ -60,6 +60,24 @@ export interface SimulationConfig {
   restActionTicks: number;
   constructionProgressPerTick: number;
   buildTaskCapacity: number;
+
+  // --- 자원·생산 체인 (나무/돌) ---
+  initialWood: number;
+  initialStone: number;
+  initialLumberyards: number;
+  initialQuarries: number;
+  initialLumberjacks: number;
+  initialMiners: number;
+  lumberjackWorkerCapacity: number;
+  quarryWorkerCapacity: number;
+  woodPerAction: number;
+  stonePerAction: number;
+  gatherActionTicks: number;
+  woodStockTarget: number;
+  stoneStockTarget: number;
+  houseWoodCost: number;
+  houseStoneCost: number;
+  maxResourceWorkerTransfersPerDay: number;
 }
 
 export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
@@ -121,6 +139,23 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   restActionTicks: 18,
   constructionProgressPerTick: 0.65,
   buildTaskCapacity: 4,
+
+  initialWood: 120,
+  initialStone: 80,
+  initialLumberyards: 1,
+  initialQuarries: 1,
+  initialLumberjacks: 4,
+  initialMiners: 4,
+  lumberjackWorkerCapacity: 6,
+  quarryWorkerCapacity: 6,
+  woodPerAction: 1.2,
+  stonePerAction: 0.9,
+  gatherActionTicks: 22,
+  woodStockTarget: 200,
+  stoneStockTarget: 150,
+  houseWoodCost: 10,
+  houseStoneCost: 5,
+  maxResourceWorkerTransfersPerDay: 4,
 };
 
 export function createSimulationConfig(
@@ -150,6 +185,8 @@ export function createSimulationConfig(
   if (config.initialFarmers > config.initialPopulation) {
     throw new RangeError("initialFarmers cannot exceed initialPopulation");
   }
+  // 벌목공·채석공은 인구를 초과해도 인구공장이 인덱스 순서로 자연스럽게 상한 처리하므로
+  // 별도 예외는 두지 않는다(작은 인구 실험 설정 호환).
   if (config.ticksPerDay <= 0 || !Number.isInteger(config.ticksPerDay)) {
     throw new RangeError("ticksPerDay must be a positive integer");
   }

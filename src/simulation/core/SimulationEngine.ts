@@ -70,7 +70,10 @@ export class SimulationEngine {
     this.state = {
       citizens,
       buildings,
-      resources: createResourcePool(),
+      resources: createResourcePool({
+        wood: this.config.initialWood,
+        stone: this.config.initialStone,
+      }),
       tasks: [],
       statistics: [],
       dailyMetrics: {
@@ -243,7 +246,11 @@ function createActivitySummary(state: SimulationState): ActivitySummary {
   for (const citizen of state.citizens) {
     if (citizen.actionState === "moving") {
       summary.moving += 1;
-    } else if (citizen.goal === "work_farm") {
+    } else if (
+      citizen.goal === "work_farm" ||
+      citizen.goal === "gather_wood" ||
+      citizen.goal === "gather_stone"
+    ) {
       summary.farming += 1;
     } else if (citizen.goal === "eat") {
       summary.eating += 1;

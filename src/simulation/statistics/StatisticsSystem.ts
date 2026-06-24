@@ -1,5 +1,6 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type {
+  BuildingType,
   DailyStatistics,
   SimulationState,
 } from "../types";
@@ -16,9 +17,17 @@ export function createDailyStatistics(
   const farmerCount = state.citizens.filter(
     (citizen) => citizen.job === "farmer",
   ).length;
+  const lumberjackCount = state.citizens.filter(
+    (citizen) => citizen.job === "lumberjack",
+  ).length;
+  const minerCount = state.citizens.filter(
+    (citizen) => citizen.job === "miner",
+  ).length;
   const farmCount = countBuildings(state, "farm");
   const houseCount = countBuildings(state, "house");
   const warehouseCount = countBuildings(state, "warehouse");
+  const lumberjackBuildingCount = countBuildings(state, "lumberjack");
+  const quarryCount = countBuildings(state, "quarry");
   const housingCapacity = state.buildings
     .filter(
       (building) =>
@@ -31,6 +40,8 @@ export function createDailyStatistics(
     day,
     population,
     foodStock: round(state.resources.food),
+    woodStock: round(state.resources.wood),
+    stoneStock: round(state.resources.stone),
     foodProduced: round(foodResult.produced),
     foodConsumed: round(foodResult.consumed),
     unmetFoodDemand: round(foodResult.unmetDemand),
@@ -39,10 +50,15 @@ export function createDailyStatistics(
       average(state.citizens.map((citizen) => citizen.happiness)),
     ),
     farmerCount,
-    unemployedCount: population - farmerCount,
+    lumberjackCount,
+    minerCount,
+    unemployedCount:
+      population - farmerCount - lumberjackCount - minerCount,
     farmCount,
     houseCount,
     warehouseCount,
+    lumberjackBuildingCount,
+    quarryCount,
     housingCapacity,
     housingDemand: calculateBuildingDemand(state, config).houses,
     populationLost: foodResult.populationLost,
@@ -63,7 +79,7 @@ export function createInitialStatistics(
 
 function countBuildings(
   state: SimulationState,
-  type: "farm" | "house" | "warehouse",
+  type: BuildingType,
 ): number {
   return state.buildings.filter(
     (building) =>

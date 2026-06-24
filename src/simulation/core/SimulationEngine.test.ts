@@ -78,6 +78,44 @@ describe("SimulationEngine", () => {
     expect(engine.getBuildingDemand().houses).toBe(0);
   });
 
+  it("벌목장·채석장에서 나무와 돌을 채집해 마을 비축이 쌓인다", () => {
+    const engine = new SimulationEngine({ seed: "resource-chain" });
+    const initial = engine.getSnapshot();
+    expect(initial.buildings.some((b) => b.type === "lumberjack")).toBe(true);
+    expect(initial.buildings.some((b) => b.type === "quarry")).toBe(true);
+
+    engine.runDays(5);
+    const stats = engine.getLatestStatistics();
+    expect(stats.lumberjackCount).toBeGreaterThan(0);
+    expect(stats.minerCount).toBeGreaterThan(0);
+    expect(stats.woodStock).toBeGreaterThan(0);
+    expect(stats.stoneStock).toBeGreaterThan(0);
+  });
+
+  it("나무·돌이 없으면 주택을 착공하지 못한다", () => {
+    const engine = new SimulationEngine({
+      seed: "no-resources",
+      initialHouses: 8,
+      initialWood: 0,
+      initialStone: 0,
+      initialLumberyards: 0,
+      initialQuarries: 0,
+      initialLumberjacks: 0,
+      initialMiners: 0,
+      woodPerAction: 0,
+      stonePerAction: 0,
+    });
+    expect(
+      engine.getSnapshot().buildings.some(
+        (b) => b.type === "house" && b.constructionProgress < 100,
+      ),
+    ).toBe(false);
+    expect(engine.getBuildingDemand().houses).toBeGreaterThan(0);
+
+    engine.runDays(3);
+    expect(engine.getLatestStatistics().houseCount).toBeLessThanOrEqual(8);
+  });
+
   it("식량 생산과 비축이 없으면 행복도와 인구가 감소한다", () => {
     const engine = new SimulationEngine({
       seed: "starvation-test",

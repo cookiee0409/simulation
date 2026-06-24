@@ -138,6 +138,32 @@ export function chooseGoal(
     }
   }
 
+  if (citizen.canWork && citizen.job === "lumberjack") {
+    for (const task of tasksByType("gather_wood")) {
+      const reasons = [
+        reason("벌목공 직업", 46),
+        reason("채집 작업 수요", task.priority * 0.42),
+        reason("배고픔", -citizen.hunger * 0.72),
+        reason("피로", -citizen.fatigue * 0.32),
+        reason("거리", -distance(citizen.position, task.targetPosition) * 0.07),
+      ];
+      candidates.push(candidate("gather_wood", task, reasons));
+    }
+  }
+
+  if (citizen.canWork && citizen.job === "miner") {
+    for (const task of tasksByType("gather_stone")) {
+      const reasons = [
+        reason("채석공 직업", 46),
+        reason("채집 작업 수요", task.priority * 0.42),
+        reason("배고픔", -citizen.hunger * 0.72),
+        reason("피로", -citizen.fatigue * 0.32),
+        reason("거리", -distance(citizen.position, task.targetPosition) * 0.07),
+      ];
+      candidates.push(candidate("gather_stone", task, reasons));
+    }
+  }
+
   if (citizen.canWork) {
     for (const task of tasksByType("carry_food_to_warehouse")) {
       const reasons = [
