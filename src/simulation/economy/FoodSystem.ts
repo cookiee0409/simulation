@@ -89,7 +89,9 @@ function updateCitizenWellbeing(
     0,
     100,
   );
-  citizen.canWork = citizen.health > config.canWorkHealthThreshold;
+  citizen.canWork =
+    citizen.health > config.canWorkHealthThreshold &&
+    citizen.age >= config.childMaturityYears;
 }
 
 function shouldLeaveFromHunger(

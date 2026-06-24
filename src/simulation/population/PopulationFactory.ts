@@ -20,7 +20,7 @@ export function createCitizens(
     const position = createStartingPosition(index, home, config);
     citizens.push({
       id: `citizen-${String(index + 1).padStart(3, "0")}`,
-      age: random.integer(18, 68),
+      age: random.integer(config.founderAgeMin, config.founderAgeMax),
       job:
         index < config.initialFarmers
           ? "farmer"
@@ -57,6 +57,52 @@ export function createCitizens(
     });
   }
   return citizens;
+}
+
+/**
+ * 마을에서 태어난 아이를 생성한다. 부모의 집을 배정받고, 성년이 될 때까지
+ * 노동할 수 없는(canWork=false) 무직 아동으로 시작한다.
+ */
+export function createChild(
+  serial: number,
+  config: SimulationConfig,
+  random: SeededRandom,
+  home: Building | undefined,
+): Citizen {
+  const base = home?.entrance ?? { x: config.mapWidth / 2, y: config.mapHeight / 2 };
+  return {
+    id: `citizen-${String(serial).padStart(3, "0")}`,
+    age: 0,
+    job: "unemployed",
+    position: {
+      x: clamp(base.x, config.gridSize, config.mapWidth - config.gridSize),
+      y: clamp(base.y, config.gridSize, config.mapHeight - config.gridSize),
+    },
+    homeId: home?.id,
+    wealth: random.between(0, 10),
+    hunger: random.between(0, 6),
+    health: random.between(88, 100),
+    happiness: random.between(60, 80),
+    canWork: false,
+    action: "idle",
+    groupId: home ? `home-${home.id}` : `group-${random.integer(1, 4)}`,
+    traits: {
+      cooperation: random.integer(0, 100),
+      riskTolerance: random.integer(0, 100),
+      savingPreference: random.integer(0, 100),
+    },
+    fatigue: 0,
+    goal: "wander",
+    actionState: "deciding",
+    path: [],
+    pathIndex: 0,
+    actionProgress: 0,
+    decisionCooldown: 0,
+    decisionScore: 0,
+    decisionReasons: [],
+    carriedFood: 0,
+    lastMealDay: -1,
+  };
 }
 
 function createStartingPosition(

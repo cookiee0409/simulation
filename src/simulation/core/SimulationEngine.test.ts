@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { SimulationEngine } from "./SimulationEngine";
 
 describe("SimulationEngine", () => {
-  it("100명의 NPC와 농장·완공 주택·창고를 생성한다", () => {
+  it("작은 마을(10명)과 농장·주택·창고·채집장을 생성한다", () => {
     const engine = new SimulationEngine({ seed: "creation-test" });
     const snapshot = engine.getSnapshot();
 
-    expect(snapshot.citizens).toHaveLength(100);
+    expect(snapshot.citizens).toHaveLength(10);
     expect(
       snapshot.buildings.filter((item) => item.type === "farm"),
     ).toHaveLength(1);
@@ -14,15 +14,43 @@ describe("SimulationEngine", () => {
       snapshot.buildings.filter(
         (item) => item.type === "house" && item.constructionProgress >= 100,
       ),
-    ).toHaveLength(9);
+    ).toHaveLength(3);
     expect(
       snapshot.buildings.filter((item) => item.type === "warehouse"),
     ).toHaveLength(1);
     expect(
-      snapshot.buildings.some(
-        (item) => item.type === "house" && item.constructionProgress < 100,
-      ),
+      snapshot.buildings.some((item) => item.type === "lumberjack"),
     ).toBe(true);
+    expect(snapshot.buildings.some((item) => item.type === "quarry")).toBe(true);
+  });
+
+  it("식량과 주택 여유가 있으면 아이가 태어나 인구가 늘어난다", () => {
+    const engine = new SimulationEngine({ seed: "growth-test" });
+    const start = engine.getSnapshot().citizens.length;
+    expect(start).toBe(10);
+
+    engine.runDays(80);
+    const stats = engine.getLatestStatistics();
+    const totalBirths = engine
+      .getSnapshot()
+      .statistics.reduce((sum, day) => sum + day.births, 0);
+
+    expect(totalBirths).toBeGreaterThan(0);
+    expect(stats.population).toBeGreaterThan(start);
+    expect(stats.childrenCount).toBeGreaterThan(0);
+    // 인구가 늘면 주택도 인구를 앞서 더 지어진다.
+    expect(stats.houseCount).toBeGreaterThan(3);
+  });
+
+  it("아이는 성년이 되기 전에는 일하지 못한다", () => {
+    const engine = new SimulationEngine({ seed: "child-labor-test" });
+    engine.runDays(60);
+    const child = engine
+      .getSnapshot()
+      .citizens.find((citizen) => citizen.age < 15);
+    expect(child).toBeDefined();
+    expect(child!.canWork).toBe(false);
+    expect(child!.job).toBe("unemployed");
   });
 
   it("stepTick과 stepDay가 144틱 일자를 유지한다", () => {
@@ -64,18 +92,17 @@ describe("SimulationEngine", () => {
     expect(after.farmerCount).toBeGreaterThan(before.farmerCount);
   });
 
-  it("주택 부족 시 건설 작업을 거쳐 주택이 완공된다", () => {
+  it("주택이 부족하면 건설 작업을 거쳐 주택이 추가로 완공된다", () => {
     const engine = new SimulationEngine({
       seed: "housing-demand-test",
-      initialHouses: 8,
-      houseCapacity: 10,
+      initialHouses: 1,
     });
+    expect(engine.getBuildingDemand().houses).toBeGreaterThan(0);
     expect(engine.getSnapshot().tasks.some((task) => task.type === "build_house"))
       .toBe(true);
 
-    engine.runDays(3);
-    expect(engine.getLatestStatistics().houseCount).toBeGreaterThanOrEqual(10);
-    expect(engine.getBuildingDemand().houses).toBe(0);
+    engine.runDays(6);
+    expect(engine.getLatestStatistics().houseCount).toBeGreaterThan(1);
   });
 
   it("벌목장·채석장에서 나무와 돌을 채집해 마을 비축이 쌓인다", () => {
@@ -95,7 +122,7 @@ describe("SimulationEngine", () => {
   it("나무·돌이 없으면 주택을 착공하지 못한다", () => {
     const engine = new SimulationEngine({
       seed: "no-resources",
-      initialHouses: 8,
+      initialHouses: 1,
       initialWood: 0,
       initialStone: 0,
       initialLumberyards: 0,
@@ -105,15 +132,15 @@ describe("SimulationEngine", () => {
       woodPerAction: 0,
       stonePerAction: 0,
     });
+    expect(engine.getBuildingDemand().houses).toBeGreaterThan(0);
     expect(
       engine.getSnapshot().buildings.some(
         (b) => b.type === "house" && b.constructionProgress < 100,
       ),
     ).toBe(false);
-    expect(engine.getBuildingDemand().houses).toBeGreaterThan(0);
 
     engine.runDays(3);
-    expect(engine.getLatestStatistics().houseCount).toBeLessThanOrEqual(8);
+    expect(engine.getLatestStatistics().houseCount).toBeLessThanOrEqual(1);
   });
 
   it("식량 생산과 비축이 없으면 행복도와 인구가 감소한다", () => {

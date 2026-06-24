@@ -277,7 +277,14 @@ function createState(
     resources: createResourcePool(),
     tasks: [],
     statistics: [],
-    dailyMetrics: { foodProduced: 0, foodConsumed: 0, populationLost: 0 },
+    dailyMetrics: {
+      foodProduced: 0,
+      foodConsumed: 0,
+      populationLost: 0,
+      births: 0,
+      deaths: 0,
+    },
     mapRevision: 0,
+    nextCitizenSerial: 2,
   };
 }

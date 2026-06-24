@@ -15,6 +15,7 @@ export interface SimulationConfig {
   houseCapacity: number;
   warehouseCapacity: number;
   maxFarmerTransfersPerDay: number;
+  farmerSurplusRatio: number; // 인구 식량 수요 대비 농부 목표 배수(>1이면 잉여 생산)
   hungerRecoveryPerDay: number;
   hungerGainAtZeroFood: number;
   severeHungerThreshold: number;
@@ -78,22 +79,37 @@ export interface SimulationConfig {
   houseWoodCost: number;
   houseStoneCost: number;
   maxResourceWorkerTransfersPerDay: number;
+
+  // --- 인구 성장 동학 (출산·노화·사망) ---
+  agingYearsPerDay: number; // 하루에 늘어나는 나이(년)
+  childMaturityYears: number; // 이 나이 이상이어야 노동 가능
+  fertilityMinAge: number; // 출산 가능 최소 나이
+  fertilityMaxAge: number; // 출산 가능 최대 나이
+  maxAgeYears: number; // 이 나이를 넘으면 노령 사망 확률 적용
+  oldAgeDeathChancePerDay: number; // 노령 사망 일일 확률
+  birthFoodPerCapita: number; // 출산에 필요한 1인당 식량 비축
+  birthChancePerDay: number; // 출산 가능 조합당 일일 확률
+  maxBirthsPerDay: number; // 하루 최대 출생 수(점진적 성장)
+  housingGrowthBuffer: number; // 인구보다 미리 확보할 주택 여유 인원
+  founderAgeMin: number; // 시작 주민 최소 나이
+  founderAgeMax: number; // 시작 주민 최대 나이
 }
 
 export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   seed: "village-001",
-  initialPopulation: 100,
-  initialFood: 250,
-  initialFarmers: 12,
+  initialPopulation: 10,
+  initialFood: 100,
+  initialFarmers: 3,
   initialFarms: 1,
-  initialHouses: 9,
+  initialHouses: 3,
   initialWarehouses: 1,
   foodPerCitizenPerDay: 1,
   foodPerFarmerPerDay: 5.3,
-  farmWorkerCapacity: 12,
-  houseCapacity: 10,
+  farmWorkerCapacity: 6,
+  houseCapacity: 4,
   warehouseCapacity: 600,
   maxFarmerTransfersPerDay: 5,
+  farmerSurplusRatio: 1.3,
   hungerRecoveryPerDay: 12,
   hungerGainAtZeroFood: 34,
   severeHungerThreshold: 78,
@@ -131,31 +147,44 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   foodPerMeal: 1,
   mealHungerRecovery: 70,
   eatActionTicks: 4,
-  farmActionTicks: 20,
-  farmFoodPerAction: 1.5,
+  farmActionTicks: 16,
+  farmFoodPerAction: 3,
   carryPickupTicks: 2,
   carryDropoffTicks: 2,
-  carryCapacity: 4,
+  carryCapacity: 10,
   restActionTicks: 18,
   constructionProgressPerTick: 0.65,
   buildTaskCapacity: 4,
 
-  initialWood: 120,
-  initialStone: 80,
+  initialWood: 40,
+  initialStone: 24,
   initialLumberyards: 1,
   initialQuarries: 1,
-  initialLumberjacks: 4,
-  initialMiners: 4,
-  lumberjackWorkerCapacity: 6,
-  quarryWorkerCapacity: 6,
+  initialLumberjacks: 2,
+  initialMiners: 1,
+  lumberjackWorkerCapacity: 4,
+  quarryWorkerCapacity: 4,
   woodPerAction: 1.2,
   stonePerAction: 0.9,
   gatherActionTicks: 22,
-  woodStockTarget: 200,
-  stoneStockTarget: 150,
-  houseWoodCost: 10,
-  houseStoneCost: 5,
-  maxResourceWorkerTransfersPerDay: 4,
+  woodStockTarget: 120,
+  stoneStockTarget: 90,
+  houseWoodCost: 8,
+  houseStoneCost: 4,
+  maxResourceWorkerTransfersPerDay: 3,
+
+  agingYearsPerDay: 0.12,
+  childMaturityYears: 15,
+  fertilityMinAge: 18,
+  fertilityMaxAge: 45,
+  maxAgeYears: 70,
+  oldAgeDeathChancePerDay: 0.04,
+  birthFoodPerCapita: 1.5,
+  birthChancePerDay: 0.45,
+  maxBirthsPerDay: 1,
+  housingGrowthBuffer: 3,
+  founderAgeMin: 18,
+  founderAgeMax: 30,
 };
 
 export function createSimulationConfig(

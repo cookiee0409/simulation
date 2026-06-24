@@ -127,6 +127,8 @@ export interface DailyActivityMetrics {
   foodProduced: number;
   foodConsumed: number;
   populationLost: number;
+  births: number;
+  deaths: number;
 }
 
 export interface DailyStatistics {
@@ -140,6 +142,10 @@ export interface DailyStatistics {
   unmetFoodDemand: number;
   averageHunger: number;
   averageHappiness: number;
+  averageAge: number;
+  births: number;
+  deaths: number;
+  childrenCount: number;
   farmerCount: number;
   lumberjackCount: number;
   minerCount: number;
@@ -178,6 +184,8 @@ export interface SimulationState {
   statistics: DailyStatistics[];
   dailyMetrics: DailyActivityMetrics;
   mapRevision: number;
+  /** 출생 시민에게 부여할 다음 일련번호(결정적 id 생성용). */
+  nextCitizenSerial: number;
 }
 
 export interface SimulationSnapshot {

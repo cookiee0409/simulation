@@ -12,7 +12,7 @@ export function adjustFarmWorkforce(
   const dailyDemand =
     state.citizens.length * config.foodPerCitizenPerDay;
   const desiredFarmers = Math.ceil(
-    (dailyDemand * 1.05) / config.foodPerFarmerPerDay,
+    (dailyDemand * config.farmerSurplusRatio) / config.foodPerFarmerPerDay,
   );
   const currentFarmers = state.citizens.filter(
     (citizen) => citizen.job === "farmer",

@@ -28,14 +28,14 @@ const BUILDING_POSITIONS: Record<BuildingType, GridPosition[]> = {
     { x: 660, y: 260 },
   ],
   lumberjack: [
-    { x: 120, y: 450 },
-    { x: 240, y: 450 },
-    { x: 360, y: 450 },
+    { x: 60, y: 450 },
+    { x: 60, y: 350 },
+    { x: 60, y: 250 },
   ],
   quarry: [
-    { x: 540, y: 450 },
-    { x: 640, y: 450 },
-    { x: 440, y: 450 },
+    { x: 700, y: 450 },
+    { x: 700, y: 350 },
+    { x: 700, y: 250 },
   ],
 };
 

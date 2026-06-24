@@ -6,6 +6,7 @@ import {
 } from "../economy/FoodSystem";
 import { buildOneNeededFarm } from "../city/BuildingDemandSystem";
 import { adjustResourceWorkforce } from "../economy/ResourceSystem";
+import { updatePopulationDynamics } from "../population/PopulationDynamicsSystem";
 import {
   adjustFarmWorkforce,
   assignWorkersToFarms,
@@ -36,6 +37,16 @@ export function createDefaultSystems(): SimulationSystem[] {
       name: "daily-food-settlement",
       update(context) {
         context.foodResult = processFoodDay(
+          context.state,
+          context.config,
+          context.random,
+        );
+      },
+    },
+    {
+      name: "population-dynamics",
+      update(context) {
+        updatePopulationDynamics(
           context.state,
           context.config,
           context.random,

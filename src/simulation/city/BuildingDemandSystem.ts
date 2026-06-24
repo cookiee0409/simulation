@@ -24,14 +24,18 @@ export function calculateBuildingDemand(
     config.foodPerFarmerPerDay <= 0
       ? 0
       : Math.ceil(
-          (state.citizens.length * config.foodPerCitizenPerDay * 1.05) /
+          (state.citizens.length *
+            config.foodPerCitizenPerDay *
+            config.farmerSurplusRatio) /
             config.foodPerFarmerPerDay,
         );
   const desiredFarms = Math.ceil(
     desiredFarmers / Math.max(1, config.farmWorkerCapacity),
   );
+  // 인구보다 약간 앞서 주택을 지어 출산이 멈추지 않도록 여유분을 더한다.
   const desiredHouses = Math.ceil(
-    state.citizens.length / Math.max(1, config.houseCapacity),
+    (state.citizens.length + config.housingGrowthBuffer) /
+      Math.max(1, config.houseCapacity),
   );
 
   return {

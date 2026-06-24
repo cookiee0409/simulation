@@ -80,8 +80,11 @@ export class SimulationEngine {
         foodProduced: 0,
         foodConsumed: 0,
         populationLost: 0,
+        births: 0,
+        deaths: 0,
       },
       mapRevision: 0,
+      nextCitizenSerial: citizens.length + 1,
     };
     synchronizeVillageFood(this.state);
     assignWorkersToFarms(this.state);
@@ -228,6 +231,8 @@ export class SimulationEngine {
       foodProduced: 0,
       foodConsumed: 0,
       populationLost: 0,
+      births: 0,
+      deaths: 0,
     };
     return { ...statistics };
   }

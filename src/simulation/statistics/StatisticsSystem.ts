@@ -14,6 +14,9 @@ export function createDailyStatistics(
   foodResult: FoodDayResult,
 ): DailyStatistics {
   const population = state.citizens.length;
+  const childrenCount = state.citizens.filter(
+    (citizen) => citizen.age < config.childMaturityYears,
+  ).length;
   const farmerCount = state.citizens.filter(
     (citizen) => citizen.job === "farmer",
   ).length;
@@ -49,6 +52,10 @@ export function createDailyStatistics(
     averageHappiness: round(
       average(state.citizens.map((citizen) => citizen.happiness)),
     ),
+    averageAge: round(average(state.citizens.map((citizen) => citizen.age))),
+    births: state.dailyMetrics.births,
+    deaths: state.dailyMetrics.deaths,
+    childrenCount,
     farmerCount,
     lumberjackCount,
     minerCount,

@@ -87,10 +87,10 @@ export default function App() {
     <main className="app-shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">AUTONOMOUS VILLAGE · SEED {snapshot.seed}</p>
-          <h1>움직이는 작은 사회</h1>
+          <p className="eyebrow">GROWING VILLAGE · SEED {snapshot.seed}</p>
+          <h1>자라나는 작은 마을</h1>
           <p className="subtitle">
-            주민들은 마을의 필요와 자신의 상태를 살펴보고 목적지를 선택합니다.
+            열 명에서 시작해 농사·채집·출산으로 인구가 늘고 마을이 커집니다.
           </p>
         </div>
         <div className="day-card">
@@ -130,20 +130,16 @@ export default function App() {
 
           <div className="metric-grid">
             <Metric label="인구" value={`${stats.population}명`} />
-            <Metric label="창고 식량" value={format(stats.foodStock)} />
-            <Metric label="나무" value={format(stats.woodStock)} />
-            <Metric label="돌" value={format(stats.stoneStock)} />
-            <Metric label="평균 행복도" value={`${format(stats.averageHappiness)}점`} />
+            <Metric label="아이" value={`${stats.childrenCount}명`} />
+            <Metric label="평균 나이" value={`${format(stats.averageAge)}세`} />
+            <Metric label="완공 주택" value={`${stats.houseCount}채`} />
+            <Metric label="농장" value={`${stats.farmCount}개`} />
             <Metric
-              label="농부·벌목·채석"
+              label="일꾼 농·벌·채"
               value={`${stats.farmerCount}·${stats.lumberjackCount}·${stats.minerCount}`}
             />
-            <Metric label="완공 주택" value={`${stats.houseCount}채`} />
-            <Metric
-              label="주택 수요"
-              value={`${stats.housingDemand}채`}
-              warning={stats.housingDemand > 0}
-            />
+            <Metric label="창고 식량" value={format(stats.foodStock)} />
+            <Metric label="나무·돌" value={`${format(stats.woodStock)}·${format(stats.stoneStock)}`} />
           </div>
 
           <ActivityBoard snapshot={snapshot} />
@@ -166,8 +162,8 @@ export default function App() {
                   <div className="history-row" key={entry.day}>
                     <b>D{entry.day}</b>
                     <span>인구 {entry.population}</span>
-                    <span>식량 {format(entry.foodStock)}</span>
-                    <span>생산 {format(entry.foodProduced)}</span>
+                    <span>출생 +{entry.births}</span>
+                    <span>사망 -{entry.deaths}</span>
                   </div>
                 ))}
               </div>
@@ -230,7 +226,9 @@ function CitizenPanel({ citizen }: { citizen: Citizen }) {
           <p className="eyebrow">SELECTED CITIZEN</p>
           <h3>{citizen.id}</h3>
         </div>
-        <span>{JOB_LABELS[citizen.job]}</span>
+        <span>
+          {citizen.age < 15 ? "아이" : JOB_LABELS[citizen.job]} · {Math.floor(citizen.age)}세
+        </span>
       </div>
       <dl className="citizen-facts">
         <div><dt>현재 목표</dt><dd>{GOAL_LABELS[citizen.goal]}</dd></div>
