@@ -17,6 +17,23 @@ export function createDailyStatistics(
   const childrenCount = state.citizens.filter(
     (citizen) => citizen.age < config.childMaturityYears,
   ).length;
+  const settlerCount = state.citizens.filter(
+    (citizen) => citizen.job === "settler",
+  ).length;
+  const professionCount = new Set(
+    state.citizens
+      .filter((c) => c.job !== "settler" && c.job !== "unemployed")
+      .map((c) => c.job),
+  ).size;
+  const buildingTypeCount = new Set(
+    state.buildings
+      .filter((b) => b.constructionProgress >= 100)
+      .map((b) => b.type),
+  ).size;
+  const topNeedUrgency = state.needs.reduce(
+    (max, need) => Math.max(max, need.urgency),
+    0,
+  );
   const farmerCount = state.citizens.filter(
     (citizen) => citizen.job === "farmer",
   ).length;
@@ -56,6 +73,10 @@ export function createDailyStatistics(
     births: state.dailyMetrics.births,
     deaths: state.dailyMetrics.deaths,
     childrenCount,
+    settlerCount,
+    professionCount,
+    buildingTypeCount,
+    topNeedUrgency: round(topNeedUrgency),
     farmerCount,
     lumberjackCount,
     minerCount,

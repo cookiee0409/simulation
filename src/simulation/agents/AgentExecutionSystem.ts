@@ -16,6 +16,9 @@ export class AgentExecutionSystem {
     }
 
     switch (citizen.goal) {
+      case "forage":
+        this.performForage(citizen, state, config, random);
+        break;
       case "work_farm":
         this.performFarmWork(citizen, state, config, random);
         break;
@@ -89,6 +92,56 @@ export class AgentExecutionSystem {
       );
     farm.inventory.food = (farm.inventory.food ?? 0) + amount;
     state.dailyMetrics.foodProduced += amount;
+    complete(citizen);
+  }
+
+  private performForage(
+    citizen: Citizen,
+    state: SimulationState,
+    config: SimulationConfig,
+    random?: SeededRandom,
+  ): void {
+    if (citizen.job !== "settler" || !citizen.canWork) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += 1 / config.forageActionTicks;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    // 야생 식량은 하루 한계가 있다(인구가 늘면 채집만으로 부족해져 농업이 필요해진다).
+    const remaining = config.wildFoodPerDay - state.dailyMetrics.foragedToday;
+    if (remaining <= 0) {
+      complete(citizen);
+      return;
+    }
+    const productivity = Math.max(
+      config.farmerHealthProductivityFloor,
+      citizen.health / 100,
+    );
+    const amount = Math.min(
+      remaining,
+      config.forageFoodPerAction *
+        productivity *
+        Math.max(
+          0,
+          1 +
+            (random?.between(
+              -config.dailyProductionNoise,
+              config.dailyProductionNoise,
+            ) ?? 0),
+        ),
+    );
+    const warehouse = findNearestWarehouse(citizen, state);
+    if (warehouse) {
+      const stored = warehouse.inventory.food ?? 0;
+      warehouse.inventory.food = Math.min(
+        warehouse.capacity,
+        stored + amount,
+      );
+      state.dailyMetrics.foodProduced += amount;
+      state.dailyMetrics.foragedToday += amount;
+    }
     complete(citizen);
   }
 
@@ -339,6 +392,7 @@ function updateLegacyAction(citizen: Citizen): void {
     citizen.action = "eating";
   } else if (
     citizen.goal === "work_farm" ||
+    citizen.goal === "forage" ||
     citizen.goal === "gather_wood" ||
     citizen.goal === "gather_stone" ||
     citizen.goal === "build" ||

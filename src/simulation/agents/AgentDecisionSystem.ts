@@ -2,6 +2,7 @@ import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
 import { distance, type AgentPerception } from "./AgentPerceptionSystem";
 import type {
+  Building,
   Citizen,
   CitizenDecisionReason,
   CitizenGoal,
@@ -84,6 +85,11 @@ export class AgentDecisionSystem {
     citizen.targetPosition = decision.task
       ? { ...decision.task.targetPosition }
       : undefined;
+    if (decision.goal === "forage" && !citizen.targetPosition) {
+      const spot = nearestForageSpot(citizen, state);
+      citizen.targetId = spot?.id;
+      citizen.targetPosition = spot ? { ...spot.entrance } : undefined;
+    }
     citizen.path = [];
     citizen.pathIndex = 0;
     citizen.actionProgress = 0;
@@ -206,13 +212,15 @@ export function chooseGoal(
     candidates.push(candidate("rest", homeTask, reasons));
   }
 
-  if (citizen.job === "unemployed" && citizen.canWork) {
+  if (citizen.job === "settler" && citizen.canWork) {
     candidates.push({
-      goal: "seek_work",
-      score: 44 + perception.foodShortage * 0.35,
+      goal: "forage",
+      score:
+        38 + perception.foodShortage * 0.5 - citizen.fatigue * 0.2,
       reasons: [
-        reason("무직", 44),
-        reason("마을 식량 부족", perception.foodShortage * 0.35),
+        reason("정착민 생존 채집", 38),
+        reason("마을 식량 부족", perception.foodShortage * 0.5),
+        reason("피로", -citizen.fatigue * 0.2),
       ],
     });
   }
@@ -232,6 +240,27 @@ export function chooseGoal(
       return leftKey.localeCompare(rightKey);
     });
   return tied.length === 1 ? tied[0]! : random.pick(tied);
+}
+
+/** 채집 목적지: 가까운 경작지(농장) 입구, 없으면 창고 주변. */
+function nearestForageSpot(
+  citizen: Citizen,
+  state: SimulationState,
+): Building | undefined {
+  const candidates = state.buildings.filter(
+    (b) =>
+      (b.type === "farm" || b.type === "warehouse") &&
+      b.constructionProgress >= 100,
+  );
+  return candidates.sort((left, right) => {
+    const dl =
+      Math.abs(citizen.position.x - left.entrance.x) +
+      Math.abs(citizen.position.y - left.entrance.y);
+    const dr =
+      Math.abs(citizen.position.x - right.entrance.x) +
+      Math.abs(citizen.position.y - right.entrance.y);
+    return dl - dr || left.id.localeCompare(right.id);
+  })[0];
 }
 
 function candidate(

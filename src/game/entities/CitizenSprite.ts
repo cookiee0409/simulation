@@ -3,6 +3,7 @@ import type { Citizen } from "../../simulation";
 
 const GOAL_ICONS: Record<Citizen["goal"], string> = {
   eat: "🍞",
+  forage: "🧺",
   work_farm: "🌾",
   gather_wood: "🪓",
   gather_stone: "⛏️",

@@ -12,23 +12,13 @@ export function createCitizens(
     (house) => house.constructionProgress >= 100,
   );
 
-  const lumberjackUntil = config.initialFarmers + config.initialLumberjacks;
-  const minerUntil = lumberjackUntil + config.initialMiners;
-
   for (let index = 0; index < config.initialPopulation; index += 1) {
     const home = completedHouses[Math.floor(index / config.houseCapacity)];
     const position = createStartingPosition(index, home, config);
     citizens.push({
       id: `citizen-${String(index + 1).padStart(3, "0")}`,
       age: random.integer(config.founderAgeMin, config.founderAgeMax),
-      job:
-        index < config.initialFarmers
-          ? "farmer"
-          : index < lumberjackUntil
-            ? "lumberjack"
-            : index < minerUntil
-              ? "miner"
-              : "unemployed",
+      job: "settler",
       position,
       homeId: home?.id,
       wealth: random.between(80, 120),
@@ -73,7 +63,7 @@ export function createChild(
   return {
     id: `citizen-${String(serial).padStart(3, "0")}`,
     age: 0,
-    job: "unemployed",
+    job: "settler",
     position: {
       x: clamp(base.x, config.gridSize, config.mapWidth - config.gridSize),
       y: clamp(base.y, config.gridSize, config.mapHeight - config.gridSize),

@@ -5,12 +5,10 @@ import {
   type FoodDayResult,
 } from "../economy/FoodSystem";
 import { buildOneNeededFarm } from "../city/BuildingDemandSystem";
-import { adjustResourceWorkforce } from "../economy/ResourceSystem";
 import { updatePopulationDynamics } from "../population/PopulationDynamicsSystem";
-import {
-  adjustFarmWorkforce,
-  assignWorkersToFarms,
-} from "../population/WorkforceSystem";
+import { updateNeeds } from "../needs/NeedSystem";
+import { updateProfessionEmergence } from "../professions/ProfessionEmergenceSystem";
+import { computeSettlementStage } from "../settlement/SettlementStageSystem";
 import type { SimulationState } from "../types";
 
 export interface SystemContext {
@@ -30,7 +28,11 @@ export function createEmptyFoodResult(): FoodDayResult {
   return { produced: 0, consumed: 0, unmetDemand: 0, populationLost: 0 };
 }
 
-/** 하루가 끝날 때만 실행되는 기존 생산 수요·인력·통계 호환 파이프라인. */
+/**
+ * 하루 단위 성장 엔진 파이프라인. 순환의 중심:
+ * 식량 정산 → 수요 계산 → 직업 창발 → 인구 동학 → 시설 건설 → 발전 단계 평가.
+ * 직업은 더 이상 식량 방정식으로 자동 배치되지 않고 수요 기반으로 창발한다.
+ */
 export function createDefaultSystems(): SimulationSystem[] {
   return [
     {
@@ -41,6 +43,18 @@ export function createDefaultSystems(): SimulationSystem[] {
           context.config,
           context.random,
         );
+      },
+    },
+    {
+      name: "needs",
+      update(context) {
+        updateNeeds(context.state, context.config);
+      },
+    },
+    {
+      name: "profession-emergence",
+      update(context) {
+        updateProfessionEmergence(context.state, context.config);
       },
     },
     {
@@ -60,21 +74,9 @@ export function createDefaultSystems(): SimulationSystem[] {
       },
     },
     {
-      name: "workforce",
+      name: "settlement-stage",
       update(context) {
-        adjustFarmWorkforce(context.state, context.config);
-      },
-    },
-    {
-      name: "resource-workforce",
-      update(context) {
-        adjustResourceWorkforce(context.state, context.config);
-      },
-    },
-    {
-      name: "worker-assignment",
-      update(context) {
-        assignWorkersToFarms(context.state);
+        context.state.stage = computeSettlementStage(context.state);
       },
     },
   ];

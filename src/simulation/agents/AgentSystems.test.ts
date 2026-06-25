@@ -100,7 +100,6 @@ describe("자율 에이전트 시스템", () => {
   it("농장 인벤토리에 식량이 생기면 운반 작업을 생성한다", () => {
     const config = createSimulationConfig({
       initialPopulation: 1,
-      initialFarmers: 1,
     });
     const random = new SeededRandom("carry-task");
     const farm = createBuilding("farm", 0, 12, random, config);
@@ -283,8 +282,12 @@ function createState(
       populationLost: 0,
       births: 0,
       deaths: 0,
+      foragedToday: 0,
     },
     mapRevision: 0,
     nextCitizenSerial: 2,
+    needs: [],
+    opportunities: [],
+    stage: "camp",
   };
 }

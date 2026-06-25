@@ -5,7 +5,6 @@ export interface SimulationConfig {
   seed: string;
   initialPopulation: number;
   initialFood: number;
-  initialFarmers: number;
   initialFarms: number;
   initialHouses: number;
   initialWarehouses: number;
@@ -67,8 +66,6 @@ export interface SimulationConfig {
   initialStone: number;
   initialLumberyards: number;
   initialQuarries: number;
-  initialLumberjacks: number;
-  initialMiners: number;
   lumberjackWorkerCapacity: number;
   quarryWorkerCapacity: number;
   woodPerAction: number;
@@ -78,7 +75,16 @@ export interface SimulationConfig {
   stoneStockTarget: number;
   houseWoodCost: number;
   houseStoneCost: number;
-  maxResourceWorkerTransfersPerDay: number;
+
+  // --- 정착민 생존 채집 ---
+  forageActionTicks: number; // 채집 1회 소요 틱
+  forageFoodPerAction: number; // 채집 1회 식량
+  wildFoodPerDay: number; // 하루 야생 식량 한계(인구가 이를 넘으면 농업 필요)
+
+  // --- 직업 창발(ProfessionEmergence) ---
+  opportunityThreshold: number; // 기회 점수가 이 값을 넘어야 후보
+  emergenceSustainedDays: number; // 임계 초과가 이 일수 지속되면 1명 전직
+  maxEmergencePerDay: number; // 하루 최대 전직 수
 
   // --- 인구 성장 동학 (출산·노화·사망) ---
   agingYearsPerDay: number; // 하루에 늘어나는 나이(년)
@@ -99,7 +105,6 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   seed: "village-001",
   initialPopulation: 10,
   initialFood: 100,
-  initialFarmers: 3,
   initialFarms: 1,
   initialHouses: 3,
   initialWarehouses: 1,
@@ -160,8 +165,6 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   initialStone: 24,
   initialLumberyards: 1,
   initialQuarries: 1,
-  initialLumberjacks: 2,
-  initialMiners: 1,
   lumberjackWorkerCapacity: 4,
   quarryWorkerCapacity: 4,
   woodPerAction: 1.2,
@@ -171,7 +174,13 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   stoneStockTarget: 90,
   houseWoodCost: 8,
   houseStoneCost: 4,
-  maxResourceWorkerTransfersPerDay: 3,
+
+  forageActionTicks: 16,
+  forageFoodPerAction: 1.1,
+  wildFoodPerDay: 8,
+  opportunityThreshold: 45,
+  emergenceSustainedDays: 3,
+  maxEmergencePerDay: 1,
 
   agingYearsPerDay: 0.12,
   childMaturityYears: 15,
@@ -194,7 +203,6 @@ export function createSimulationConfig(
   const nonNegativeKeys: Array<keyof SimulationConfig> = [
     "initialPopulation",
     "initialFood",
-    "initialFarmers",
     "initialFarms",
     "initialHouses",
     "initialWarehouses",
@@ -211,11 +219,7 @@ export function createSimulationConfig(
       throw new RangeError(`${key} cannot be negative`);
     }
   }
-  if (config.initialFarmers > config.initialPopulation) {
-    throw new RangeError("initialFarmers cannot exceed initialPopulation");
-  }
-  // 벌목공·채석공은 인구를 초과해도 인구공장이 인덱스 순서로 자연스럽게 상한 처리하므로
-  // 별도 예외는 두지 않는다(작은 인구 실험 설정 호환).
+  // 초기 주민은 모두 정착민이며, 직업은 수요 기반으로 창발한다(시작 직업 인원 설정 없음).
   if (config.ticksPerDay <= 0 || !Number.isInteger(config.ticksPerDay)) {
     throw new RangeError("ticksPerDay must be a positive integer");
   }

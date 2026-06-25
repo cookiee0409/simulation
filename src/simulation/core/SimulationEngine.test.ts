@@ -50,7 +50,7 @@ describe("SimulationEngine", () => {
       .citizens.find((citizen) => citizen.age < 15);
     expect(child).toBeDefined();
     expect(child!.canWork).toBe(false);
-    expect(child!.job).toBe("unemployed");
+    expect(child!.job).toBe("settler");
   });
 
   it("stepTick과 stepDay가 144틱 일자를 유지한다", () => {
@@ -77,19 +77,27 @@ describe("SimulationEngine", () => {
     expect(day.foodStock).not.toBe(before.resources.food);
   });
 
-  it("식량 수요가 생산능력을 넘으면 농장과 농업 노동자가 증가한다", () => {
-    const engine = new SimulationEngine({
-      seed: "farm-demand-test",
-      initialFarmers: 5,
-      initialFarms: 1,
-      farmWorkerCapacity: 5,
-      foodPerFarmerPerDay: 2,
-    });
-    const before = engine.getLatestStatistics();
-    const after = engine.stepDay();
+  it("시작 시 정식 직업이 없고, 식량 수요가 지속되면 정착민이 농부로 창발한다", () => {
+    const engine = new SimulationEngine({ seed: "farmer-emergence" });
+    const start = engine.getSnapshot();
+    expect(start.citizens.every((c) => c.job === "settler")).toBe(true);
+    expect(start.citizens.some((c) => c.job === "farmer")).toBe(false);
 
-    expect(after.farmCount).toBeGreaterThan(before.farmCount);
-    expect(after.farmerCount).toBeGreaterThan(before.farmerCount);
+    engine.runDays(25);
+    const stats = engine.getLatestStatistics();
+    expect(stats.farmerCount).toBeGreaterThan(0);
+    expect(stats.professionCount).toBeGreaterThan(0);
+  });
+
+  it("시간이 지나며 직업 종류가 정착민에서 분화한다", () => {
+    const engine = new SimulationEngine({ seed: "diversity" });
+    const start = engine.getLatestStatistics();
+    expect(start.professionCount).toBe(0);
+    expect(engine.getSnapshot().stage).toBe("camp");
+
+    engine.runDays(30);
+    const later = engine.getLatestStatistics();
+    expect(later.professionCount).toBeGreaterThanOrEqual(2);
   });
 
   it("주택이 부족하면 건설 작업을 거쳐 주택이 추가로 완공된다", () => {
@@ -111,7 +119,7 @@ describe("SimulationEngine", () => {
     expect(initial.buildings.some((b) => b.type === "lumberjack")).toBe(true);
     expect(initial.buildings.some((b) => b.type === "quarry")).toBe(true);
 
-    engine.runDays(5);
+    engine.runDays(14);
     const stats = engine.getLatestStatistics();
     expect(stats.lumberjackCount).toBeGreaterThan(0);
     expect(stats.minerCount).toBeGreaterThan(0);
@@ -127,8 +135,6 @@ describe("SimulationEngine", () => {
       initialStone: 0,
       initialLumberyards: 0,
       initialQuarries: 0,
-      initialLumberjacks: 0,
-      initialMiners: 0,
       woodPerAction: 0,
       stonePerAction: 0,
     });
@@ -149,6 +155,7 @@ describe("SimulationEngine", () => {
       initialFood: 0,
       foodPerFarmerPerDay: 0,
       farmFoodPerAction: 0,
+      forageFoodPerAction: 0,
     });
     const initial = engine.getLatestStatistics();
     const final = engine.runDays(20).at(-1)!;

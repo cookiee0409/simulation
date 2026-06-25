@@ -3,15 +3,14 @@ export interface GridPosition {
   y: number;
 }
 
-export type CitizenJob =
-  | "farmer"
-  | "lumberjack"
-  | "miner"
-  | "unemployed";
+/** 정착민에서 출발해 수요에 따라 창발하는 직업. */
+export type ProfessionType = "farmer" | "lumberjack" | "miner";
+export type CitizenJob = "settler" | ProfessionType | "unemployed";
 export type CitizenAction = "working" | "eating" | "idle" | "leaving";
 
 export type CitizenGoal =
   | "eat"
+  | "forage"
   | "work_farm"
   | "gather_wood"
   | "gather_stone"
@@ -129,7 +128,63 @@ export interface DailyActivityMetrics {
   populationLost: number;
   births: number;
   deaths: number;
+  /** 당일 채집으로 모은 식량(야생 식량 한계 적용용, 매일 리셋). */
+  foragedToday: number;
 }
+
+// --- 성장형 정착지: 수요·직업 창발·발전 단계 ---
+
+export type VillageNeed =
+  | "food"
+  | "shelter"
+  | "wood"
+  | "stone"
+  | "tools"
+  | "storage"
+  | "trade"
+  | "healthcare"
+  | "security"
+  | "education"
+  | "transport";
+
+export interface NeedCause {
+  factor: string;
+  weight: number;
+}
+
+export interface NeedState {
+  type: VillageNeed;
+  currentDemand: number;
+  currentSupply: number;
+  unmetDemand: number;
+  urgency: number; // 0-100
+  trend: "rising" | "stable" | "falling";
+  sustainedDays: number;
+  causes: NeedCause[];
+}
+
+export interface ProfessionOpportunityReason {
+  factor: string;
+  score: number;
+}
+
+export interface ProfessionOpportunity {
+  profession: ProfessionType;
+  score: number;
+  /** 패널 표시용 0~1 정규화 점수(실제 기회 점수 기반). */
+  normalizedScore: number;
+  relatedNeeds: VillageNeed[];
+  reasons: ProfessionOpportunityReason[];
+  sustainedDays: number;
+  eligibleCitizenIds: string[];
+}
+
+export type SettlementStage =
+  | "camp"
+  | "hamlet"
+  | "village"
+  | "growing_village"
+  | "town";
 
 export interface DailyStatistics {
   day: number;
@@ -146,6 +201,10 @@ export interface DailyStatistics {
   births: number;
   deaths: number;
   childrenCount: number;
+  settlerCount: number;
+  professionCount: number;
+  buildingTypeCount: number;
+  topNeedUrgency: number;
   farmerCount: number;
   lumberjackCount: number;
   minerCount: number;
@@ -186,6 +245,12 @@ export interface SimulationState {
   mapRevision: number;
   /** 출생 시민에게 부여할 다음 일련번호(결정적 id 생성용). */
   nextCitizenSerial: number;
+  /** 매일 갱신되는 마을 수요 상태(추세·지속일 누적). */
+  needs: NeedState[];
+  /** 직업 창발 기회 점수(지속일 누적). */
+  opportunities: ProfessionOpportunity[];
+  /** 현재 발전 단계(상태 요약 결과값). */
+  stage: SettlementStage;
 }
 
 export interface SimulationSnapshot {
@@ -203,6 +268,9 @@ export interface SimulationSnapshot {
   activitySummary: ActivitySummary;
   pathfinding: PathfindingStatistics;
   landFertility: number;
+  stage: SettlementStage;
+  needs: NeedState[];
+  opportunities: ProfessionOpportunity[];
   latestStatistics: DailyStatistics;
   statistics: DailyStatistics[];
   recentStatistics: DailyStatistics[];

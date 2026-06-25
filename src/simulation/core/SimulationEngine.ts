@@ -18,7 +18,8 @@ import { calculateBuildingDemand } from "../city/BuildingDemandSystem";
 import { synchronizeVillageFood } from "../economy/FoodSystem";
 import { GridPathfinder } from "../pathfinding/GridPathfinder";
 import { createCitizens } from "../population/PopulationFactory";
-import { assignWorkersToFarms } from "../population/WorkforceSystem";
+import { updateNeeds } from "../needs/NeedSystem";
+import { computeSettlementStage } from "../settlement/SettlementStageSystem";
 import {
   createDailyStatistics,
   createInitialStatistics,
@@ -82,12 +83,17 @@ export class SimulationEngine {
         populationLost: 0,
         births: 0,
         deaths: 0,
+        foragedToday: 0,
       },
       mapRevision: 0,
       nextCitizenSerial: citizens.length + 1,
+      needs: [],
+      opportunities: [],
+      stage: "camp",
     };
     synchronizeVillageFood(this.state);
-    assignWorkersToFarms(this.state);
+    updateNeeds(this.state, this.config);
+    this.state.stage = computeSettlementStage(this.state);
     this.tickPipeline.taskBoard.update(
       this.state,
       this.config,
@@ -202,6 +208,17 @@ export class SimulationEngine {
       activitySummary: createActivitySummary(this.state),
       pathfinding: this.pathfinder.getStatistics(),
       landFertility: this.config.landFertility,
+      stage: this.state.stage,
+      needs: this.state.needs.map((need) => ({
+        ...need,
+        causes: need.causes.map((cause) => ({ ...cause })),
+      })),
+      opportunities: this.state.opportunities.map((opportunity) => ({
+        ...opportunity,
+        relatedNeeds: [...opportunity.relatedNeeds],
+        reasons: opportunity.reasons.map((reason) => ({ ...reason })),
+        eligibleCitizenIds: [...opportunity.eligibleCitizenIds],
+      })),
       latestStatistics: this.getLatestStatistics(),
       statistics: this.state.statistics.slice(),
       recentStatistics: this.state.statistics.slice(-RECENT_STATISTICS_WINDOW),
@@ -233,6 +250,7 @@ export class SimulationEngine {
       populationLost: 0,
       births: 0,
       deaths: 0,
+      foragedToday: 0,
     };
     return { ...statistics };
   }
@@ -253,6 +271,7 @@ function createActivitySummary(state: SimulationState): ActivitySummary {
       summary.moving += 1;
     } else if (
       citizen.goal === "work_farm" ||
+      citizen.goal === "forage" ||
       citizen.goal === "gather_wood" ||
       citizen.goal === "gather_stone"
     ) {

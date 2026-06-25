@@ -13,6 +13,7 @@ const DEFAULT_SEED = "village-001";
 
 const GOAL_LABELS: Record<Citizen["goal"], string> = {
   eat: "식사",
+  forage: "채집",
   work_farm: "농사",
   gather_wood: "벌목",
   gather_stone: "채석",
@@ -25,10 +26,39 @@ const GOAL_LABELS: Record<Citizen["goal"], string> = {
 };
 
 const JOB_LABELS: Record<Citizen["job"], string> = {
+  settler: "정착민",
   farmer: "농부",
   lumberjack: "벌목공",
   miner: "채석공",
   unemployed: "무직",
+};
+
+const STAGE_LABELS: Record<SimulationSnapshot["stage"], string> = {
+  camp: "야영지",
+  hamlet: "정착촌",
+  village: "마을",
+  growing_village: "성장 마을",
+  town: "소도시",
+};
+
+const NEED_LABELS: Record<string, string> = {
+  food: "식량",
+  shelter: "주거",
+  wood: "목재",
+  stone: "석재",
+  tools: "도구",
+  storage: "저장",
+  trade: "교역",
+  healthcare: "의료",
+  security: "치안",
+  education: "교육",
+  transport: "운송",
+};
+
+const PROFESSION_LABELS: Record<string, string> = {
+  farmer: "농부",
+  lumberjack: "벌목꾼",
+  miner: "채석공",
 };
 
 export default function App() {
@@ -94,9 +124,9 @@ export default function App() {
           </p>
         </div>
         <div className="day-card">
-          <span>시뮬레이션 시간</span>
-          <strong>DAY {snapshot.day}</strong>
-          <small>{formatClock(snapshot.minuteOfDay)} · TICK {snapshot.tickInDay}</small>
+          <span>현재 단계 · DAY {snapshot.day}</span>
+          <strong>{STAGE_LABELS[snapshot.stage]}</strong>
+          <small>인구 {stats.population}명 · {formatClock(snapshot.minuteOfDay)}</small>
         </div>
       </header>
 
@@ -130,18 +160,20 @@ export default function App() {
 
           <div className="metric-grid">
             <Metric label="인구" value={`${stats.population}명`} />
+            <Metric label="정착민" value={`${stats.settlerCount}명`} />
             <Metric label="아이" value={`${stats.childrenCount}명`} />
-            <Metric label="평균 나이" value={`${format(stats.averageAge)}세`} />
+            <Metric label="직업 종류" value={`${stats.professionCount}종`} />
+            <Metric label="건물 종류" value={`${stats.buildingTypeCount}종`} />
             <Metric label="완공 주택" value={`${stats.houseCount}채`} />
-            <Metric label="농장" value={`${stats.farmCount}개`} />
             <Metric
-              label="일꾼 농·벌·채"
-              value={`${stats.farmerCount}·${stats.lumberjackCount}·${stats.minerCount}`}
+              label="최대 미충족 수요"
+              value={topNeedLabel(snapshot)}
+              warning={stats.topNeedUrgency >= 50}
             />
             <Metric label="창고 식량" value={format(stats.foodStock)} />
-            <Metric label="나무·돌" value={`${format(stats.woodStock)}·${format(stats.stoneStock)}`} />
           </div>
 
+          <ProfessionBoard snapshot={snapshot} />
           <ActivityBoard snapshot={snapshot} />
 
           {selectedCitizen ? (
@@ -193,6 +225,57 @@ export default function App() {
         <button type="button" onClick={resetSimulation}>같은 시드로 초기화</button>
       </section>
     </main>
+  );
+}
+
+function topNeedLabel(snapshot: SimulationSnapshot): string {
+  const top = [...snapshot.needs].sort((a, b) => b.urgency - a.urgency)[0];
+  if (!top || top.urgency < 1) return "없음";
+  return `${NEED_LABELS[top.type] ?? top.type} ${Math.round(top.urgency)}`;
+}
+
+function ProfessionBoard({ snapshot }: { snapshot: SimulationSnapshot }) {
+  const counts = new Map<string, number>();
+  for (const citizen of snapshot.citizens) {
+    counts.set(citizen.job, (counts.get(citizen.job) ?? 0) + 1);
+  }
+  const order = ["settler", "farmer", "lumberjack", "miner"];
+  const present = order.filter((job) => (counts.get(job) ?? 0) > 0);
+  const opportunities = [...snapshot.opportunities].sort(
+    (a, b) => b.normalizedScore - a.normalizedScore,
+  );
+  return (
+    <div className="profession-board">
+      <div className="profession-current">
+        <b>현재 구성</b>
+        <div className="profession-tags">
+          {present.map((job) => (
+            <span key={job}>
+              {JOB_LABELS[job as Citizen["job"]]} {counts.get(job)}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="profession-opportunities">
+        <b>새 직업 가능성</b>
+        {opportunities.map((opportunity) => (
+          <div className="opportunity-row" key={opportunity.profession}>
+            <span>
+              {PROFESSION_LABELS[opportunity.profession] ??
+                opportunity.profession}
+            </span>
+            <div className="opportunity-bar">
+              <i
+                style={{
+                  width: `${Math.round(opportunity.normalizedScore * 100)}%`,
+                }}
+              />
+            </div>
+            <strong>{Math.round(opportunity.normalizedScore * 100)}%</strong>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

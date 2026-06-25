@@ -3,3 +3,6 @@ dist
 .vite
 coverage
 *.log
+
+# 로컬 분석 보고서(커밋 제외)
+구조전환_분석보고서.md
