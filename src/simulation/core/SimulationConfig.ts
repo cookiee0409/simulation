@@ -84,7 +84,20 @@ export interface SimulationConfig {
   // --- 직업 창발(ProfessionEmergence) ---
   opportunityThreshold: number; // 기회 점수가 이 값을 넘어야 후보
   emergenceSustainedDays: number; // 임계 초과가 이 일수 지속되면 1명 전직
-  maxEmergencePerDay: number; // 하루 최대 전직 수
+  maxEmergencePerDay: number; // 하루 최대 전문 직업 전직 수
+  maxFoodEmergencePerDay: number; // 하루 최대 농부 창발 수(식량 직업은 더 빠르게)
+  minForagersReserve: number; // 전문 직업 분화 후에도 남겨둘 최소 채집 정착민
+
+  // --- 2차 산업(목공소·대장간·시장) ---
+  carpentryActionTicks: number;
+  carpenterConstructionBonus: number; // 목수 1명당 건설 속도 가산
+  blacksmithActionTicks: number;
+  toolsPerAction: number; // 대장간 1회 도구 생산
+  toolsStockTarget: number; // 도구 비축 목표(상한)
+  maxToolsProductivityBonus: number; // 도구가 주는 최대 생산성 가산
+  marketActionTicks: number;
+  marketIncomePerAction: number; // 시장 1회 수입(money)
+  marketHappinessBonus: number; // 시장 가동 시 일일 행복 가산
 
   // --- 인구 성장 동학 (출산·노화·사망) ---
   agingYearsPerDay: number; // 하루에 늘어나는 나이(년)
@@ -117,15 +130,15 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   farmerSurplusRatio: 1.3,
   hungerRecoveryPerDay: 12,
   hungerGainAtZeroFood: 34,
-  severeHungerThreshold: 78,
-  baseSevereHungerExitChance: 0.055,
+  severeHungerThreshold: 97,
+  baseSevereHungerExitChance: 0.008,
   landFertilityMin: 0.55,
   landFertilityMax: 1.35,
   landFertility: 1,
   dailyProductionNoise: 0.1,
   farmerHealthProductivityFloor: 0.35,
-  hungerHealthThreshold: 55,
-  healthLossPerHungerOverThreshold: 0.08,
+  hungerHealthThreshold: 75,
+  healthLossPerHungerOverThreshold: 0.05,
   healthRecoveryPerDay: 0.25,
   canWorkHealthThreshold: 25,
   happinessBase: 28,
@@ -144,11 +157,11 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   perceptionRadius: 220,
   decisionCooldownTicks: 8,
   movementCellsPerTick: 1,
-  hungerGainPerTick: 0.34,
+  hungerGainPerTick: 0.26,
   fatigueGainPerTick: 0.18,
   fatigueRecoveryPerRestTick: 2.4,
-  emergencyHungerThreshold: 72,
-  eatHungerThreshold: 32,
+  emergencyHungerThreshold: 50,
+  eatHungerThreshold: 30,
   foodPerMeal: 1,
   mealHungerRecovery: 70,
   eatActionTicks: 4,
@@ -180,7 +193,19 @@ export const DEFAULT_SIMULATION_CONFIG: Readonly<SimulationConfig> = {
   wildFoodPerDay: 8,
   opportunityThreshold: 45,
   emergenceSustainedDays: 3,
-  maxEmergencePerDay: 1,
+  maxEmergencePerDay: 2,
+  maxFoodEmergencePerDay: 2,
+  minForagersReserve: 3,
+
+  carpentryActionTicks: 18,
+  carpenterConstructionBonus: 0.6,
+  blacksmithActionTicks: 22,
+  toolsPerAction: 1,
+  toolsStockTarget: 30,
+  maxToolsProductivityBonus: 0.35,
+  marketActionTicks: 16,
+  marketIncomePerAction: 2,
+  marketHappinessBonus: 4,
 
   agingYearsPerDay: 0.12,
   childMaturityYears: 15,

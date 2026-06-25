@@ -6,7 +6,11 @@ import type {
 } from "../types";
 
 /** 생산 전문화를 상징하는 건물(마을 단계 이상에서 등장). */
-const SPECIALIZED_BUILDINGS: Building["type"][] = [];
+const SPECIALIZED_BUILDINGS: Building["type"][] = [
+  "carpentry",
+  "blacksmith",
+  "market",
+];
 
 /**
  * 마을 발전 단계는 직업을 여는 잠금장치가 아니라 현재 상태의 요약 결과값이다.

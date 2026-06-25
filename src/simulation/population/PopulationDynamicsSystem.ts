@@ -89,7 +89,11 @@ function applyBirths(
     if (!random.chance(config.birthChancePerDay)) {
       continue;
     }
+    // 빈자리가 있는 실제 집이 있어야만 출산한다(아이가 집 입구에서 시작 → 발 묶임 방지).
     const home = findHomeWithRoom(state);
+    if (!home) {
+      break;
+    }
     state.citizens.push(
       createChild(state.nextCitizenSerial, config, random, home),
     );

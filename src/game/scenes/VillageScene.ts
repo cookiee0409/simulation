@@ -18,6 +18,12 @@ const COLORS = {
   lumberjackRoof: 0x3f7d4a,
   quarry: 0x8a8f99,
   quarryRock: 0x5d626b,
+  carpentry: 0xb98a4e,
+  carpentryRoof: 0x7c5a2e,
+  blacksmith: 0x6a6f78,
+  blacksmithRoof: 0x3e424a,
+  market: 0xe4c06a,
+  marketStripe: 0xcf5b4b,
 };
 
 export class VillageScene extends Phaser.Scene {
@@ -76,6 +82,7 @@ export class VillageScene extends Phaser.Scene {
     if (!this.snapshot) {
       return;
     }
+    this.drawTerrain();
     this.drawBuildings(this.snapshot.buildings);
     const activeIds = new Set(this.snapshot.citizens.map((citizen) => citizen.id));
     const interpolationDuration =
@@ -111,18 +118,18 @@ export class VillageScene extends Phaser.Scene {
     if (!this.terrain) {
       return;
     }
+    const width = this.snapshot?.mapWidth ?? 760;
+    const height = this.snapshot?.mapHeight ?? 520;
     this.terrain.clear();
     this.terrain.fillStyle(COLORS.ground, 1);
-    this.terrain.fillRect(0, 0, 760, 520);
+    this.terrain.fillRect(0, 0, width, height);
     this.terrain.fillStyle(0x7aae6c, 0.7);
-    for (let index = 0; index < 28; index += 1) {
-      const x = 18 + ((index * 83) % 720);
-      const y = 35 + ((index * 47) % 450);
+    const count = Math.floor((width * height) / 14000);
+    for (let index = 0; index < count; index += 1) {
+      const x = 18 + ((index * 83) % (width - 36));
+      const y = 35 + ((index * 47) % (height - 70));
       this.terrain.fillCircle(x, y, 4 + (index % 3));
     }
-    this.terrain.fillStyle(COLORS.road, 0.9);
-    this.terrain.fillRoundedRect(45, 235, 670, 30, 9);
-    this.terrain.fillRoundedRect(345, 50, 30, 420, 8);
   }
 
   private drawBuildings(items: Building[]): void {
@@ -221,6 +228,74 @@ export class VillageScene extends Phaser.Scene {
       this.buildings.fillCircle(building.position.x - 14, building.position.y + 4, 9);
       this.buildings.fillCircle(building.position.x + 10, building.position.y - 2, 11);
       this.addBuildingLabel(building, "채석장");
+    } else if (building.type === "carpentry") {
+      this.buildings.fillStyle(COLORS.carpentry, alpha);
+      this.buildings.fillRoundedRect(
+        building.position.x - 38,
+        building.position.y - 22,
+        76,
+        44,
+        5,
+      );
+      this.buildings.fillStyle(COLORS.carpentryRoof, alpha);
+      this.buildings.fillRect(
+        building.position.x - 42,
+        building.position.y - 28,
+        84,
+        10,
+      );
+      // 켜놓은 판자
+      this.buildings.fillStyle(0xe7cf9c, alpha);
+      this.buildings.fillRect(building.position.x + 16, building.position.y + 10, 26, 5);
+      this.buildings.fillRect(building.position.x + 16, building.position.y + 17, 26, 5);
+      this.addBuildingLabel(building, "목공소");
+    } else if (building.type === "blacksmith") {
+      this.buildings.fillStyle(COLORS.blacksmith, alpha);
+      this.buildings.fillRoundedRect(
+        building.position.x - 34,
+        building.position.y - 20,
+        68,
+        40,
+        5,
+      );
+      this.buildings.fillStyle(COLORS.blacksmithRoof, alpha);
+      this.buildings.fillTriangle(
+        building.position.x - 38,
+        building.position.y - 16,
+        building.position.x + 38,
+        building.position.y - 16,
+        building.position.x,
+        building.position.y - 40,
+      );
+      // 굴뚝 + 불씨
+      this.buildings.fillStyle(0x4a4e55, alpha);
+      this.buildings.fillRect(building.position.x + 18, building.position.y - 44, 10, 22);
+      this.buildings.fillStyle(0xe8762d, alpha);
+      this.buildings.fillCircle(building.position.x + 23, building.position.y - 46, 4);
+      this.addBuildingLabel(building, "대장간");
+    } else if (building.type === "market") {
+      this.buildings.fillStyle(COLORS.market, alpha);
+      this.buildings.fillRoundedRect(
+        building.position.x - 40,
+        building.position.y - 14,
+        80,
+        34,
+        4,
+      );
+      // 줄무늬 차양
+      for (let i = 0; i < 5; i += 1) {
+        this.buildings.fillStyle(
+          i % 2 === 0 ? COLORS.marketStripe : 0xf3f0e6,
+          alpha,
+        );
+        this.buildings.fillRect(
+          building.position.x - 40 + i * 16,
+          building.position.y - 26,
+          16,
+          12,
+        );
+      }
+      this.addBuildingLabel(building, "시장");
     } else {
       this.buildings.fillStyle(COLORS.warehouse, alpha);
       this.buildings.fillRoundedRect(

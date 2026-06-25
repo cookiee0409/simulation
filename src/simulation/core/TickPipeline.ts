@@ -4,6 +4,7 @@ import { AgentMovementSystem } from "../agents/AgentMovementSystem";
 import { AgentNeedsSystem } from "../agents/AgentNeedsSystem";
 import { AgentPerceptionSystem } from "../agents/AgentPerceptionSystem";
 import { synchronizeVillageFood } from "../economy/FoodSystem";
+import { getBuildingHalfSize } from "../city/BuildingFactory";
 import type { GridPathfinder } from "../pathfinding/GridPathfinder";
 import { TaskBoardSystem } from "../tasks/TaskBoardSystem";
 import type { SimulationConfig } from "./SimulationConfig";
@@ -39,6 +40,7 @@ export class TickPipeline {
     );
 
     for (const citizen of citizens) {
+      unstickFromBuildings(citizen, state, config);
       this.needs.updateCitizen(citizen, config);
       if (this.decision.shouldReconsider(citizen, state, config)) {
         const perception = this.perception.observe(
@@ -60,5 +62,28 @@ export class TickPipeline {
       this.execution.updateCitizen(citizen, state, config, day, random);
     }
     synchronizeVillageFood(state);
+  }
+}
+
+/**
+ * 건물 면적 안에 갇힌 주민을 그 건물 입구로 내보낸다(통행 가능 칸). 출생·건물 배치 등
+ * 어떤 이유로 갇히든 매 틱 안전망으로 풀어 줘 식량·집 접근 불능에 의한 아사를 막는다.
+ */
+function unstickFromBuildings(
+  citizen: { position: { x: number; y: number }; path: unknown[]; pathIndex: number },
+  state: SimulationState,
+  config: SimulationConfig,
+): void {
+  for (const building of state.buildings) {
+    const half = getBuildingHalfSize(building.type, config.gridSize);
+    if (
+      Math.abs(citizen.position.x - building.position.x) <= half.x &&
+      Math.abs(citizen.position.y - building.position.y) <= half.y
+    ) {
+      citizen.position = { ...building.entrance };
+      citizen.path = [];
+      citizen.pathIndex = 0;
+      return;
+    }
   }
 }

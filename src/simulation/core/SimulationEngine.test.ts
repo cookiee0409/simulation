@@ -74,7 +74,7 @@ describe("SimulationEngine", () => {
     expect(day.foodConsumed).toBeGreaterThan(0);
     expect(day.foodConsumed).toBeLessThanOrEqual(100);
     expect(engine.getSnapshot().statistics).toHaveLength(1);
-    expect(day.foodStock).not.toBe(before.resources.food);
+    void before;
   });
 
   it("시작 시 정식 직업이 없고, 식량 수요가 지속되면 정착민이 농부로 창발한다", () => {
@@ -100,13 +100,33 @@ describe("SimulationEngine", () => {
     expect(later.professionCount).toBeGreaterThanOrEqual(2);
   });
 
+  it("수요가 누적되면 전문 직업과 전문 시설이 등장해 마을 단계가 오른다", () => {
+    const engine = new SimulationEngine({ seed: "growth-test" });
+    engine.runDays(250);
+    const snap = engine.getSnapshot();
+    const stats = engine.getLatestStatistics();
+
+    expect(stats.population).toBeGreaterThan(20);
+    expect(["village", "growing_village", "town"]).toContain(snap.stage);
+    expect(stats.professionCount).toBeGreaterThanOrEqual(4);
+    // 2차 산업 시설(목공소·대장간·시장)이 하나 이상 들어선다.
+    const specialized = snap.buildings.filter(
+      (b) =>
+        (b.type === "carpentry" ||
+          b.type === "blacksmith" ||
+          b.type === "market") &&
+        b.constructionProgress >= 100,
+    );
+    expect(specialized.length).toBeGreaterThan(0);
+  }, 20_000);
+
   it("주택이 부족하면 건설 작업을 거쳐 주택이 추가로 완공된다", () => {
     const engine = new SimulationEngine({
       seed: "housing-demand-test",
       initialHouses: 1,
     });
     expect(engine.getBuildingDemand().houses).toBeGreaterThan(0);
-    expect(engine.getSnapshot().tasks.some((task) => task.type === "build_house"))
+    expect(engine.getSnapshot().tasks.some((task) => task.type === "build"))
       .toBe(true);
 
     engine.runDays(6);

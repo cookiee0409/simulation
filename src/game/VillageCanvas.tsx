@@ -28,8 +28,8 @@ export function VillageCanvas({
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: containerRef.current,
-      width: 760,
-      height: 520,
+      width: snapshot.mapWidth,
+      height: snapshot.mapHeight,
       transparent: true,
       scene: [VillageScene],
       render: { antialias: true, pixelArt: false },
@@ -74,8 +74,12 @@ export function VillageCanvas({
       aria-label="마을 시뮬레이션 화면"
       onPointerDown={(event) => {
         const bounds = event.currentTarget.getBoundingClientRect();
-        const x = ((event.clientX - bounds.left) / bounds.width) * 760;
-        const y = ((event.clientY - bounds.top) / bounds.height) * 520;
+        const x =
+          ((event.clientX - bounds.left) / bounds.width) *
+          snapshotRef.current.mapWidth;
+        const y =
+          ((event.clientY - bounds.top) / bounds.height) *
+          snapshotRef.current.mapHeight;
         const nearest = snapshotRef.current.citizens
           .map((citizen) => ({
             id: citizen.id,

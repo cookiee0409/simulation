@@ -1,6 +1,10 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
-import type { Citizen, SimulationState } from "../types";
+import {
+  constructionSpeedMultiplier,
+  toolProductivityMultiplier,
+} from "../economy/IndustrySystem";
+import type { Building, Citizen, SimulationState } from "../types";
 
 export class AgentExecutionSystem {
   updateCitizen(
@@ -28,6 +32,15 @@ export class AgentExecutionSystem {
       case "gather_stone":
         this.performGather(citizen, state, config, "stone", random);
         break;
+      case "work_carpentry":
+        this.performCarpentry(citizen, state, config);
+        break;
+      case "work_blacksmith":
+        this.performBlacksmith(citizen, state, config, random);
+        break;
+      case "work_market":
+        this.performMarket(citizen, state, config);
+        break;
       case "carry_food":
         this.performCarry(citizen, state, config);
         break;
@@ -42,7 +55,7 @@ export class AgentExecutionSystem {
         this.performConstruction(citizen, state, config);
         break;
       case "seek_work":
-        this.performJobSearch(citizen, state);
+        complete(citizen);
         break;
       case "wander":
         citizen.actionProgress = Math.min(1, citizen.actionProgress + 0.5);
@@ -82,6 +95,7 @@ export class AgentExecutionSystem {
       config.farmFoodPerAction *
       config.landFertility *
       productivity *
+      toolProductivityMultiplier(state, config) *
       Math.max(
         0,
         1 +
@@ -177,6 +191,7 @@ export class AgentExecutionSystem {
     const amount =
       yieldPerAction *
       productivity *
+      toolProductivityMultiplier(state, config) *
       Math.max(
         0,
         1 +
@@ -309,10 +324,10 @@ export class AgentExecutionSystem {
     state: SimulationState,
     config: SimulationConfig,
   ): void {
+    // 종류와 무관하게 짓는 중인 목표 건물을 건설한다(목수가 있으면 더 빠름).
     const site = state.buildings.find(
       (building) =>
         building.id === citizen.targetId &&
-        building.type === "house" &&
         building.constructionProgress < 100,
     );
     if (!site) {
@@ -321,7 +336,9 @@ export class AgentExecutionSystem {
     }
     site.constructionProgress = Math.min(
       100,
-      site.constructionProgress + config.constructionProgressPerTick,
+      site.constructionProgress +
+        config.constructionProgressPerTick *
+          constructionSpeedMultiplier(state, config),
     );
     citizen.actionProgress = site.constructionProgress / 100;
     if (site.constructionProgress >= 100) {
@@ -330,23 +347,89 @@ export class AgentExecutionSystem {
     }
   }
 
-  private performJobSearch(
+  private performCarpentry(
     citizen: Citizen,
     state: SimulationState,
+    config: SimulationConfig,
   ): void {
-    const farmCapacity = state.buildings
-      .filter(
-        (building) =>
-          building.type === "farm" && building.constructionProgress >= 100,
-      )
-      .reduce((sum, building) => sum + building.capacity, 0);
-    const farmers = state.citizens.filter(
-      (candidate) => candidate.job === "farmer",
-    ).length;
-    if (farmers < farmCapacity) {
-      citizen.job = "farmer";
+    // 목공소에서 목재를 가공한다(소량 소비). 효과는 건설 속도 가산으로 나타난다.
+    if (!this.atWorkshop(citizen, state, "carpentry")) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += 1 / config.carpentryActionTicks;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    if (state.resources.wood >= 1) {
+      state.resources.wood -= 1;
     }
     complete(citizen);
+  }
+
+  private performBlacksmith(
+    citizen: Citizen,
+    state: SimulationState,
+    config: SimulationConfig,
+    random?: SeededRandom,
+  ): void {
+    if (!this.atWorkshop(citizen, state, "blacksmith")) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += 1 / config.blacksmithActionTicks;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    // 광석·연료(돌·나무)를 소비해 도구를 만든다.
+    if (state.resources.stone >= 1 && state.resources.wood >= 0.5) {
+      state.resources.stone -= 1;
+      state.resources.wood = Math.max(0, state.resources.wood - 0.5);
+      const noise = Math.max(
+        0,
+        1 +
+          (random?.between(
+            -config.dailyProductionNoise,
+            config.dailyProductionNoise,
+          ) ?? 0),
+      );
+      state.resources.tools = Math.min(
+        config.toolsStockTarget,
+        state.resources.tools + config.toolsPerAction * noise,
+      );
+    }
+    complete(citizen);
+  }
+
+  private performMarket(
+    citizen: Citizen,
+    state: SimulationState,
+    config: SimulationConfig,
+  ): void {
+    if (!this.atWorkshop(citizen, state, "market")) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += 1 / config.marketActionTicks;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    // 잉여 상품을 거래해 마을 수입(money)을 만든다.
+    state.resources.money += config.marketIncomePerAction;
+    complete(citizen);
+  }
+
+  private atWorkshop(
+    citizen: Citizen,
+    state: SimulationState,
+    type: Building["type"],
+  ): boolean {
+    return state.buildings.some(
+      (building) =>
+        building.id === citizen.targetId &&
+        building.type === type &&
+        building.constructionProgress >= 100,
+    );
   }
 }
 
@@ -395,6 +478,9 @@ function updateLegacyAction(citizen: Citizen): void {
     citizen.goal === "forage" ||
     citizen.goal === "gather_wood" ||
     citizen.goal === "gather_stone" ||
+    citizen.goal === "work_carpentry" ||
+    citizen.goal === "work_blacksmith" ||
+    citizen.goal === "work_market" ||
     citizen.goal === "build" ||
     citizen.goal === "carry_food"
   ) {

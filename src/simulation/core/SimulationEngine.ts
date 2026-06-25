@@ -208,6 +208,8 @@ export class SimulationEngine {
       activitySummary: createActivitySummary(this.state),
       pathfinding: this.pathfinder.getStatistics(),
       landFertility: this.config.landFertility,
+      mapWidth: this.config.mapWidth,
+      mapHeight: this.config.mapHeight,
       stage: this.state.stage,
       needs: this.state.needs.map((need) => ({
         ...need,

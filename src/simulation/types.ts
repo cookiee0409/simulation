@@ -4,7 +4,13 @@ export interface GridPosition {
 }
 
 /** 정착민에서 출발해 수요에 따라 창발하는 직업. */
-export type ProfessionType = "farmer" | "lumberjack" | "miner";
+export type ProfessionType =
+  | "farmer"
+  | "lumberjack"
+  | "miner"
+  | "carpenter"
+  | "blacksmith"
+  | "merchant";
 export type CitizenJob = "settler" | ProfessionType | "unemployed";
 export type CitizenAction = "working" | "eating" | "idle" | "leaving";
 
@@ -14,6 +20,9 @@ export type CitizenGoal =
   | "work_farm"
   | "gather_wood"
   | "gather_stone"
+  | "work_carpentry"
+  | "work_blacksmith"
+  | "work_market"
   | "carry_food"
   | "rest"
   | "return_home"
@@ -76,15 +85,18 @@ export type BuildingType =
   | "house"
   | "warehouse"
   | "lumberjack"
-  | "quarry";
-export type ResourceType = "food" | "wood" | "stone" | "money";
+  | "quarry"
+  | "carpentry"
+  | "blacksmith"
+  | "market";
+export type ResourceType = "food" | "wood" | "stone" | "tools" | "money";
 export type ResourcePool = Record<ResourceType, number>;
 export type ResourceInventory = Partial<ResourcePool>;
 
 export function createResourcePool(
   initial: Partial<ResourcePool> = {},
 ): ResourcePool {
-  return { food: 0, wood: 0, stone: 0, money: 0, ...initial };
+  return { food: 0, wood: 0, stone: 0, tools: 0, money: 0, ...initial };
 }
 
 export interface Building {
@@ -107,10 +119,13 @@ export type VillageTaskType =
   | "farm_work"
   | "gather_wood"
   | "gather_stone"
+  | "carpentry_work"
+  | "blacksmith_work"
+  | "market_work"
   | "carry_food_to_warehouse"
   | "eat_food"
   | "rest_at_home"
-  | "build_house";
+  | "build";
 
 export interface VillageTask {
   id: string;
@@ -268,6 +283,8 @@ export interface SimulationSnapshot {
   activitySummary: ActivitySummary;
   pathfinding: PathfindingStatistics;
   landFertility: number;
+  mapWidth: number;
+  mapHeight: number;
   stage: SettlementStage;
   needs: NeedState[];
   opportunities: ProfessionOpportunity[];

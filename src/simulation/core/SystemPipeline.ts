@@ -4,7 +4,11 @@ import {
   processFoodDay,
   type FoodDayResult,
 } from "../economy/FoodSystem";
-import { buildOneNeededFarm } from "../city/BuildingDemandSystem";
+import {
+  buildOneNeededFarm,
+  buildNeededWarehouse,
+} from "../city/BuildingDemandSystem";
+import { applyMarketDailyEffects } from "../economy/IndustrySystem";
 import { updatePopulationDynamics } from "../population/PopulationDynamicsSystem";
 import { updateNeeds } from "../needs/NeedSystem";
 import { updateProfessionEmergence } from "../professions/ProfessionEmergenceSystem";
@@ -54,7 +58,17 @@ export function createDefaultSystems(): SimulationSystem[] {
     {
       name: "profession-emergence",
       update(context) {
-        updateProfessionEmergence(context.state, context.config);
+        updateProfessionEmergence(
+          context.state,
+          context.config,
+          context.random,
+        );
+      },
+    },
+    {
+      name: "industry-effects",
+      update(context) {
+        applyMarketDailyEffects(context.state, context.config);
       },
     },
     {
@@ -68,9 +82,10 @@ export function createDefaultSystems(): SimulationSystem[] {
       },
     },
     {
-      name: "farm-construction",
+      name: "infrastructure-construction",
       update(context) {
         buildOneNeededFarm(context.state, context.config, context.random);
+        buildNeededWarehouse(context.state, context.config, context.random);
       },
     },
     {

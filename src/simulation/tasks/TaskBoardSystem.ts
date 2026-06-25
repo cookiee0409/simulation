@@ -1,11 +1,13 @@
 import { calculateBuildingDemand } from "../city/BuildingDemandSystem";
-import { createBuilding } from "../city/BuildingFactory";
+import { requestBuilding } from "../city/BuildingConstruction";
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
 import type {
+  BuildingType,
   Citizen,
   SimulationState,
   VillageTask,
+  VillageTaskType,
 } from "../types";
 
 export class TaskBoardSystem {
@@ -154,16 +156,14 @@ export class TaskBoardSystem {
       );
     }
 
+    // 종류와 무관하게 짓는 중인 모든 건물에 건설 작업을 연다.
     for (const site of state.buildings
-      .filter(
-        (building) =>
-          building.type === "house" && building.constructionProgress < 100,
-      )
+      .filter((building) => building.constructionProgress < 100)
       .sort((left, right) => left.id.localeCompare(right.id))) {
       tasks.push(
         createTask(
-          `build-house:${site.id}`,
-          "build_house",
+          `build:${site.id}`,
+          "build",
           site.id,
           site.entrance,
           90,
@@ -172,6 +172,11 @@ export class TaskBoardSystem {
         ),
       );
     }
+
+    // 2차 산업 작업장(목공소·대장간·시장).
+    addWorkshopTasks(tasks, state, "carpentry", "carpentry_work", 54, previousAssignments);
+    addWorkshopTasks(tasks, state, "blacksmith", "blacksmith_work", 52, previousAssignments);
+    addWorkshopTasks(tasks, state, "market", "market_work", 48, previousAssignments);
 
     state.tasks = tasks;
     this.removeInvalidAssignments(state);
@@ -219,30 +224,8 @@ export class TaskBoardSystem {
     if (hasSite || calculateBuildingDemand(state, config).houses <= 0) {
       return;
     }
-    // 주택 착공은 마을 비축 나무·돌을 소비한다. 자원이 모자라면 채집을
-    // 기다리며 착공을 미룬다(생산 체인이 마을 확장을 제약한다).
-    if (
-      state.resources.wood < config.houseWoodCost ||
-      state.resources.stone < config.houseStoneCost
-    ) {
-      return;
-    }
-    state.resources.wood -= config.houseWoodCost;
-    state.resources.stone -= config.houseStoneCost;
-    const houseIndex = state.buildings.filter(
-      (building) => building.type === "house",
-    ).length;
-    state.buildings.push(
-      createBuilding(
-        "house",
-        houseIndex,
-        config.houseCapacity,
-        random,
-        config,
-        0,
-      ),
-    );
-    state.mapRevision += 1;
+    // 자재·공간이 확보될 때만 자동 부지 선정해 주택을 착공한다.
+    requestBuilding(state, config, "house", random);
   }
 
   private removeInvalidAssignments(state: SimulationState): void {
@@ -258,6 +241,33 @@ export class TaskBoardSystem {
         }
       }
     }
+  }
+}
+
+function addWorkshopTasks(
+  tasks: VillageTask[],
+  state: SimulationState,
+  buildingType: BuildingType,
+  taskType: VillageTaskType,
+  priority: number,
+  previousAssignments: Map<string, string[]>,
+): void {
+  for (const building of state.buildings
+    .filter(
+      (b) => b.type === buildingType && b.constructionProgress >= 100,
+    )
+    .sort((left, right) => left.id.localeCompare(right.id))) {
+    tasks.push(
+      createTask(
+        `${taskType}:${building.id}`,
+        taskType,
+        building.id,
+        building.entrance,
+        priority,
+        building.capacity,
+        previousAssignments,
+      ),
+    );
   }
 }
 

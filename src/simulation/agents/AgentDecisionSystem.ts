@@ -170,6 +170,10 @@ export function chooseGoal(
     }
   }
 
+  addWorkshopCandidate(candidates, citizen, "carpenter", "carpentry_work", "work_carpentry", "목수 직업", tasksByType);
+  addWorkshopCandidate(candidates, citizen, "blacksmith", "blacksmith_work", "work_blacksmith", "대장장이 직업", tasksByType);
+  addWorkshopCandidate(candidates, citizen, "merchant", "market_work", "work_market", "상인 직업", tasksByType);
+
   if (citizen.canWork) {
     for (const task of tasksByType("carry_food_to_warehouse")) {
       const reasons = [
@@ -181,11 +185,14 @@ export function chooseGoal(
       ];
       candidates.push(candidate("carry_food", task, reasons));
     }
-    for (const task of tasksByType("build_house")) {
+    for (const task of tasksByType("build")) {
       const reasons = [
-        reason("주택 부족", perception.housingShortage * 55),
+        reason("건설 대기", 20 + perception.housingShortage * 35),
         reason("건설 작업 우선도", task.priority * 0.58),
-        reason("협력 성향", citizen.traits.cooperation * 0.15),
+        reason(
+          "협력 성향",
+          citizen.traits.cooperation * (citizen.job === "carpenter" ? 0.3 : 0.15),
+        ),
         reason("배고픔", -citizen.hunger * 0.7),
         reason("거리", -distance(citizen.position, task.targetPosition) * 0.07),
       ];
@@ -240,6 +247,30 @@ export function chooseGoal(
       return leftKey.localeCompare(rightKey);
     });
   return tied.length === 1 ? tied[0]! : random.pick(tied);
+}
+
+function addWorkshopCandidate(
+  candidates: DecisionCandidate[],
+  citizen: Citizen,
+  job: Citizen["job"],
+  taskType: VillageTask["type"],
+  goal: CitizenGoal,
+  jobLabel: string,
+  tasksByType: (type: VillageTask["type"]) => VillageTask[],
+): void {
+  if (!citizen.canWork || citizen.job !== job) {
+    return;
+  }
+  for (const task of tasksByType(taskType)) {
+    const reasons = [
+      reason(jobLabel, 46),
+      reason("작업장 수요", task.priority * 0.42),
+      reason("배고픔", -citizen.hunger * 0.72),
+      reason("피로", -citizen.fatigue * 0.3),
+      reason("거리", -distance(citizen.position, task.targetPosition) * 0.07),
+    ];
+    candidates.push(candidate(goal, task, reasons));
+  }
 }
 
 /** 채집 목적지: 가까운 경작지(농장) 입구, 없으면 창고 주변. */

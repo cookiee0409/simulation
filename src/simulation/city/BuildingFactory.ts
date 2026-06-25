@@ -2,7 +2,7 @@ import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
 import type { Building, BuildingType, GridPosition } from "../types";
 
-const BUILDING_POSITIONS: Record<BuildingType, GridPosition[]> = {
+const BUILDING_POSITIONS: Partial<Record<BuildingType, GridPosition[]>> = {
   farm: [
     { x: 120, y: 100 },
     { x: 280, y: 100 },
@@ -103,9 +103,10 @@ export function createBuilding(
   random: SeededRandom,
   config?: SimulationConfig,
   constructionProgress = 100,
+  explicitPosition?: GridPosition,
 ): Building {
   const gridSize = config?.gridSize ?? 20;
-  const preset = BUILDING_POSITIONS[type][index];
+  const preset = explicitPosition ?? BUILDING_POSITIONS[type]?.[index];
   const position = preset ?? {
     x: snap(random.between(80, 680), gridSize),
     y: snap(random.between(80, 440), gridSize),
@@ -131,7 +132,7 @@ export function getBuildingPosition(
   type: BuildingType,
   index: number,
 ): GridPosition | undefined {
-  const position = BUILDING_POSITIONS[type][index];
+  const position = BUILDING_POSITIONS[type]?.[index];
   return position ? { ...position } : undefined;
 }
 
@@ -146,6 +147,9 @@ export function getBuildingHalfSize(
     return { x: gridSize * 2, y: gridSize * 1.5 };
   }
   if (type === "lumberjack" || type === "quarry") {
+    return { x: gridSize * 2, y: gridSize * 1.5 };
+  }
+  if (type === "carpentry" || type === "blacksmith" || type === "market") {
     return { x: gridSize * 2, y: gridSize * 1.5 };
   }
   return { x: gridSize * 1.5, y: gridSize };

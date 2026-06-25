@@ -17,6 +17,9 @@ const GOAL_LABELS: Record<Citizen["goal"], string> = {
   work_farm: "농사",
   gather_wood: "벌목",
   gather_stone: "채석",
+  work_carpentry: "목공",
+  work_blacksmith: "대장일",
+  work_market: "장사",
   carry_food: "식량 운반",
   rest: "휴식",
   return_home: "귀가",
@@ -30,6 +33,9 @@ const JOB_LABELS: Record<Citizen["job"], string> = {
   farmer: "농부",
   lumberjack: "벌목공",
   miner: "채석공",
+  carpenter: "목수",
+  blacksmith: "대장장이",
+  merchant: "상인",
   unemployed: "무직",
 };
 
@@ -59,6 +65,9 @@ const PROFESSION_LABELS: Record<string, string> = {
   farmer: "농부",
   lumberjack: "벌목꾼",
   miner: "채석공",
+  carpenter: "목수",
+  blacksmith: "대장장이",
+  merchant: "상인",
 };
 
 export default function App() {
@@ -239,7 +248,15 @@ function ProfessionBoard({ snapshot }: { snapshot: SimulationSnapshot }) {
   for (const citizen of snapshot.citizens) {
     counts.set(citizen.job, (counts.get(citizen.job) ?? 0) + 1);
   }
-  const order = ["settler", "farmer", "lumberjack", "miner"];
+  const order = [
+    "settler",
+    "farmer",
+    "lumberjack",
+    "miner",
+    "carpenter",
+    "blacksmith",
+    "merchant",
+  ];
   const present = order.filter((job) => (counts.get(job) ?? 0) > 0);
   const opportunities = [...snapshot.opportunities].sort(
     (a, b) => b.normalizedScore - a.normalizedScore,

@@ -21,6 +21,8 @@ export function updateNeeds(
     computeShelter(state, config),
     computeWood(state, config),
     computeStone(state, config),
+    computeTools(state, config),
+    computeTrade(state, config),
   ];
 
   for (const need of next) {
@@ -56,16 +58,18 @@ function computeFood(
       config.forageFoodPerAction *
       ((config.ticksPerDay / config.forageActionTicks) * 0.45),
   );
-  // 농부 실효 산출은 이동·운반·식사·휴식 때문에 이론치보다 낮다(보수적 추정).
+  // 농부 실효 산출은 이동·운반·식사·휴식 때문에 이론치보다 크게 낮다(보수적 추정).
+  // 낮게 잡을수록 인구 대비 더 많은 농부가 창발해 식량이 인구를 따라간다.
   const farmPerDay =
     farmers *
     config.farmFoodPerAction *
-    ((config.ticksPerDay / config.farmActionTicks) * 0.22);
+    ((config.ticksPerDay / config.farmActionTicks) * 0.62);
   const supply = foragePerDay + farmPerDay;
-  const selfSufficiency = demand === 0 ? 1 : supply / demand;
-  const stockUrgency = clamp01(1 - stock / Math.max(1, demand * 5)) * 100;
-  // 자급 부족은 가파르게 반영해 채집만으로 부족하면 농업 필요가 빠르게 드러나도록.
-  const supplyUrgency = clamp01((1 - selfSufficiency) * 2.5) * 100;
+  // 30% 식량 여유를 목표로 한다 → 인구가 늘면 농부가 계속 추가로 창발한다.
+  const target = demand * 1.3;
+  const selfSufficiency = target === 0 ? 1 : supply / target;
+  const stockUrgency = clamp01(1 - stock / Math.max(1, demand * 3)) * 100;
+  const supplyUrgency = clamp01((1 - selfSufficiency) * 2.2) * 100;
   const urgency = Math.max(stockUrgency, supplyUrgency);
   return {
     type: "food",
@@ -144,6 +148,64 @@ function computeStone(
     trend: "stable",
     sustainedDays: 0,
     causes: [{ factor: "석재 비축 부족", weight: round(urgency) }],
+  };
+}
+
+function computeTools(
+  state: SimulationState,
+  config: SimulationConfig,
+): NeedState {
+  // 1차 생산 노동자가 많을수록 도구 수요가 커진다.
+  const toolUsers = state.citizens.filter(
+    (c) => c.job === "farmer" || c.job === "lumberjack" || c.job === "miner",
+  ).length;
+  const demand = toolUsers;
+  const supply = state.resources.tools;
+  const hasMiner = state.citizens.some((c) => c.job === "miner");
+  // 도구 수요는 채굴 기반이 있을 때만 의미가 있다(요청서: 광물 없으면 대장장이 미등장).
+  const base =
+    toolUsers >= 4 ? clamp01(1 - supply / Math.max(1, demand)) * 100 : 0;
+  const urgency = hasMiner ? base : Math.min(base, 15);
+  return {
+    type: "tools",
+    currentDemand: demand,
+    currentSupply: round(supply),
+    unmetDemand: round(Math.max(0, demand - supply)),
+    urgency: round(urgency),
+    trend: "stable",
+    sustainedDays: 0,
+    causes: [{ factor: "도구 사용 노동 증가", weight: round(urgency) }],
+  };
+}
+
+function computeTrade(
+  state: SimulationState,
+  config: SimulationConfig,
+): NeedState {
+  // 두 종류 이상의 잉여 상품이 쌓이면 교환(시장) 수요가 생긴다.
+  const surpluses = [
+    state.resources.food - state.citizens.length * config.foodPerCitizenPerDay * 3,
+    state.resources.wood - config.woodStockTarget * 0.6,
+    state.resources.stone - config.stoneStockTarget * 0.6,
+    state.resources.tools - config.toolsStockTarget * 0.5,
+  ].filter((value) => value > 0);
+  const surplusKinds = surpluses.length;
+  // 잉여 상품이 하나라도 쌓이면 교환 수요가 생기고, 종류가 많을수록 커진다.
+  const urgency =
+    surplusKinds >= 1 ? Math.min(100, 30 + surplusKinds * 16) : 0;
+  return {
+    type: "trade",
+    currentDemand: surplusKinds,
+    currentSupply: state.buildings.some(
+      (b) => b.type === "market" && b.constructionProgress >= 100,
+    )
+      ? 1
+      : 0,
+    unmetDemand: surplusKinds,
+    urgency: round(urgency),
+    trend: "stable",
+    sustainedDays: 0,
+    causes: [{ factor: "잉여 상품 교환 수요", weight: round(urgency) }],
   };
 }
 
