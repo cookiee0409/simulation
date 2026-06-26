@@ -81,6 +81,7 @@ export class AgentDecisionSystem {
     }
 
     citizen.goal = decision.goal;
+    citizen.temporaryRole = temporaryRoleFor(decision.goal);
     citizen.targetId = decision.task?.targetId;
     citizen.targetPosition = decision.task
       ? { ...decision.task.targetPosition }
@@ -111,6 +112,8 @@ export function chooseGoal(
   const candidates: DecisionCandidate[] = [];
   const tasksByType = (type: VillageTask["type"]) =>
     perception.availableTasks.filter((task) => task.type === type);
+  const winterUrgency = (type: string) =>
+    perception.winterNeeds?.find((need) => need.type === type)?.urgency ?? 0;
 
   if (
     citizen.hunger >= config.eatHungerThreshold &&
@@ -135,6 +138,7 @@ export function chooseGoal(
       const reasons = [
         reason("농부 직업", 48),
         reason("마을 식량 부족", perception.foodShortage * 0.7),
+        reason("겨울 식량 비축", winterUrgency("winter_food") * 0.86),
         reason("농장 작업 수요", task.priority * 0.42),
         reason("배고픔", -citizen.hunger * 0.72),
         reason("피로", -citizen.fatigue * 0.32),
@@ -148,12 +152,108 @@ export function chooseGoal(
     for (const task of tasksByType("gather_wood")) {
       const reasons = [
         reason("벌목공 직업", 46),
+        reason("겨울 땔감 비축", winterUrgency("firewood") * 0.74),
         reason("채집 작업 수요", task.priority * 0.42),
         reason("배고픔", -citizen.hunger * 0.72),
         reason("피로", -citizen.fatigue * 0.32),
         reason("거리", -distance(citizen.position, task.targetPosition) * 0.07),
       ];
       candidates.push(candidate("gather_wood", task, reasons));
+    }
+  }
+
+  if (perception.scenario && citizen.canWork) {
+    for (const task of tasksByType("gather_wood")) {
+      if (citizen.job === "lumberjack") {
+        continue;
+      }
+      const reasons = [
+        reason("땔감 비축 필요", winterUrgency("firewood") * 0.82),
+        reason("벌목 기술", citizen.skills.logging * 0.42),
+        reason("마을 협력 성향", citizen.traits.cooperation * 0.18),
+        reason("추위 노출 위험", -perception.scenario.outdoorRisk * 42),
+        reason("피로", -citizen.fatigue * 0.32),
+      ];
+      candidates.push(candidate("gather_wood", task, reasons));
+    }
+    for (const task of tasksByType("process_firewood")) {
+      const reasons = [
+        reason("땔감 부족", winterUrgency("firewood") * 0.55),
+        reason("벌목 기술", citizen.skills.logging * 0.28),
+        reason("실내 작업 안전성", perception.scenario.outdoorRisk * 24),
+        reason("농사 전문성 유지", citizen.job === "farmer" ? -42 : 0),
+        reason("피로", -citizen.fatigue * 0.25),
+      ];
+      candidates.push(candidate("process_firewood", task, reasons));
+    }
+    for (const task of tasksByType("heat_home")) {
+      const reasons = [
+        reason("주민 보온 필요", winterUrgency("warmth") * 0.62),
+        reason("공감 성향", citizen.traits.empathy * 0.25),
+        reason("규칙 준수", citizen.traits.ruleFollowing * 0.12),
+        reason("피로", -citizen.fatigue * 0.18),
+      ];
+      candidates.push(candidate("heat_home", task, reasons));
+    }
+    for (const task of tasksByType("repair_shelter")) {
+      const reasons = [
+        reason("주택 손상", winterUrgency("shelter_repair") * 0.9),
+        reason("건축 기술", citizen.skills.construction * 0.5),
+        reason("마을 애착", citizen.traits.attachmentToVillage * 0.14),
+        reason("배고픔", -citizen.hunger * 0.25),
+      ];
+      candidates.push(candidate("repair_shelter", task, reasons));
+    }
+    for (const task of tasksByType("insulate_shelter")) {
+      const reasons = [
+        reason("단열 필요", winterUrgency("insulation") * 0.88),
+        reason("건축 기술", citizen.skills.construction * 0.46),
+        reason("인내심", citizen.traits.patience * 0.12),
+        reason("배고픔", -citizen.hunger * 0.25),
+      ];
+      candidates.push(candidate("insulate_shelter", task, reasons));
+    }
+    for (const task of tasksByType("care_sick")) {
+      if (task.targetId === citizen.id) {
+        continue;
+      }
+      if (
+        citizen.skills.medicine < 35 &&
+        citizen.traits.empathy < 70
+      ) {
+        continue;
+      }
+      const reasons = [
+        reason("환자 돌봄 필요", winterUrgency("medicine") * 0.45),
+        reason("의료 기술", citizen.skills.medicine * 0.55),
+        reason("공감 성향", citizen.traits.empathy * 0.2),
+        reason("이기성", -citizen.traits.selfishness * 0.18),
+      ];
+      candidates.push(candidate("care_sick", task, reasons));
+    }
+    if (perception.day >= 4) {
+      for (const task of tasksByType("migrate")) {
+        const migrationIntent = clamp(
+          winterUrgency("migration") * 0.55 +
+            citizen.traits.riskTolerance * 0.2 +
+            citizen.traits.selfishness * 0.22 -
+            citizen.traits.attachmentToVillage * 0.55 -
+            citizen.traits.patience * 0.12 +
+            citizen.winter.illness * 0.45 +
+            citizen.winter.coldExposure * 0.25 +
+            Math.max(0, 55 - citizen.health) * 0.45,
+          0,
+          100,
+        );
+        citizen.winter.migrationIntent = migrationIntent;
+        const reasons = [
+          reason("생존 전망 악화", winterUrgency("migration") * 0.75),
+          reason("개인 이주 의향", migrationIntent * 0.8),
+          reason("마을 애착", -citizen.traits.attachmentToVillage * 0.42),
+          reason("혹한 이동 위험", -perception.scenario.outdoorRisk * 28),
+        ];
+        candidates.push(candidate("migrate", task, reasons));
+      }
     }
   }
 
@@ -313,4 +413,23 @@ function reason(factor: string, score: number): CitizenDecisionReason {
 
 function round(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function temporaryRoleFor(goal: CitizenGoal): Citizen["temporaryRole"] {
+  switch (goal) {
+    case "gather_wood":
+    case "process_firewood":
+      return "wood_gatherer";
+    case "repair_shelter":
+    case "insulate_shelter":
+      return "builder";
+    case "care_sick":
+      return "caregiver";
+    default:
+      return undefined;
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

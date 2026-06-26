@@ -32,6 +32,11 @@ export function processFoodDay(
     if (shouldLeaveFromHunger(citizen, config, random)) {
       citizen.action = "leaving";
       populationLost += 1;
+      if (state.scenario) {
+        state.scenario.deaths += 1;
+        state.dailyMetrics.deaths += 1;
+        state.dailyMetrics.winterDeaths += 1;
+      }
     } else {
       survivors.push(citizen);
     }

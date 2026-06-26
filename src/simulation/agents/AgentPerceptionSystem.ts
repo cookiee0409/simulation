@@ -6,6 +6,8 @@ import type {
   Citizen,
   SimulationState,
   VillageTask,
+  ScenarioRuntimeState,
+  WinterNeedState,
 } from "../types";
 
 export interface AgentPerception {
@@ -16,6 +18,8 @@ export interface AgentPerception {
   housingShortage: number;
   day: number;
   tickInDay: number;
+  scenario?: ScenarioRuntimeState;
+  winterNeeds?: WinterNeedState[];
 }
 
 export class AgentPerceptionSystem {
@@ -52,6 +56,8 @@ export class AgentPerceptionSystem {
       housingShortage: calculateBuildingDemand(state, config).houses,
       day,
       tickInDay,
+      scenario: state.scenario,
+      winterNeeds: state.winterNeeds,
     };
   }
 }

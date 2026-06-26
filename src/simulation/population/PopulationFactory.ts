@@ -32,7 +32,15 @@ export function createCitizens(
         cooperation: random.integer(0, 100),
         riskTolerance: random.integer(0, 100),
         savingPreference: random.integer(0, 100),
+        empathy: random.integer(0, 100),
+        selfishness: random.integer(0, 100),
+        leadership: random.integer(0, 100),
+        patience: random.integer(0, 100),
+        attachmentToVillage: random.integer(0, 100),
+        ruleFollowing: random.integer(0, 100),
       },
+      skills: createSkills(random),
+      winter: createWinterState(random),
       fatigue: random.between(0, 12),
       goal: "wander",
       actionState: "deciding",
@@ -80,7 +88,15 @@ export function createChild(
       cooperation: random.integer(0, 100),
       riskTolerance: random.integer(0, 100),
       savingPreference: random.integer(0, 100),
+      empathy: random.integer(0, 100),
+      selfishness: random.integer(0, 100),
+      leadership: random.integer(0, 100),
+      patience: random.integer(0, 100),
+      attachmentToVillage: random.integer(0, 100),
+      ruleFollowing: random.integer(0, 100),
     },
+    skills: createSkills(random),
+    winter: createWinterState(random),
     fatigue: 0,
     goal: "wander",
     actionState: "deciding",
@@ -92,6 +108,35 @@ export function createChild(
     decisionReasons: [],
     carriedFood: 0,
     lastMealDay: -1,
+  };
+}
+
+function createSkills(random: SeededRandom): Citizen["skills"] {
+  return {
+    farming: random.integer(10, 65),
+    logging: random.integer(10, 65),
+    construction: random.integer(10, 65),
+    hunting: random.integer(5, 60),
+    medicine: random.integer(0, 50),
+    cooking: random.integer(10, 60),
+    scouting: random.integer(5, 65),
+    negotiation: random.integer(5, 65),
+    leadership: random.integer(5, 65),
+  };
+}
+
+function createWinterState(random: SeededRandom): Citizen["winter"] {
+  return {
+    bodyTemperature: random.between(36.4, 36.9),
+    coldExposure: 0,
+    warmth: 80,
+    clothingWarmth: random.integer(20, 70),
+    illness: random.between(0, 8),
+    frostbiteRisk: 0,
+    personalFood: 0,
+    personalFirewood: 0,
+    wetness: 0,
+    migrationIntent: 0,
   };
 }
 

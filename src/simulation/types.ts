@@ -23,6 +23,12 @@ export type CitizenGoal =
   | "work_carpentry"
   | "work_blacksmith"
   | "work_market"
+  | "process_firewood"
+  | "heat_home"
+  | "repair_shelter"
+  | "insulate_shelter"
+  | "care_sick"
+  | "migrate"
   | "carry_food"
   | "rest"
   | "return_home"
@@ -47,6 +53,47 @@ export interface CitizenTraits {
   cooperation: number;
   riskTolerance: number;
   savingPreference: number;
+  empathy: number;
+  selfishness: number;
+  leadership: number;
+  patience: number;
+  attachmentToVillage: number;
+  ruleFollowing: number;
+}
+
+export interface CitizenSkills {
+  farming: number;
+  logging: number;
+  construction: number;
+  hunting: number;
+  medicine: number;
+  cooking: number;
+  scouting: number;
+  negotiation: number;
+  leadership: number;
+}
+
+export type TemporaryRole =
+  | "wood_gatherer"
+  | "food_gatherer"
+  | "hunter"
+  | "builder"
+  | "caregiver"
+  | "scout"
+  | "expedition_member"
+  | "ration_manager";
+
+export interface WinterCitizenState {
+  bodyTemperature: number;
+  coldExposure: number;
+  warmth: number;
+  clothingWarmth: number;
+  illness: number;
+  frostbiteRisk: number;
+  personalFood: number;
+  personalFirewood: number;
+  wetness: number;
+  migrationIntent: number;
 }
 
 export interface Citizen {
@@ -63,6 +110,9 @@ export interface Citizen {
   action: CitizenAction;
   groupId: string;
   traits: CitizenTraits;
+  skills: CitizenSkills;
+  temporaryRole?: TemporaryRole;
+  winter: WinterCitizenState;
   fatigue: number;
   goal: CitizenGoal;
   actionState: CitizenActionState;
@@ -89,14 +139,44 @@ export type BuildingType =
   | "carpentry"
   | "blacksmith"
   | "market";
-export type ResourceType = "food" | "wood" | "stone" | "tools" | "money";
+export type ResourceType =
+  | "food"
+  | "wood"
+  | "stone"
+  | "tools"
+  | "money"
+  | "firewood"
+  | "medicine"
+  | "warm_clothing";
 export type ResourcePool = Record<ResourceType, number>;
 export type ResourceInventory = Partial<ResourcePool>;
 
 export function createResourcePool(
   initial: Partial<ResourcePool> = {},
 ): ResourcePool {
-  return { food: 0, wood: 0, stone: 0, tools: 0, money: 0, ...initial };
+  return {
+    food: 0,
+    wood: 0,
+    stone: 0,
+    tools: 0,
+    money: 0,
+    firewood: 0,
+    medicine: 0,
+    warm_clothing: 0,
+    ...initial,
+  };
+}
+
+export interface WinterBuildingState {
+  insulation: number;
+  indoorTemperature: number;
+  heatingLevel: number;
+  firewoodStored: number;
+  maxOccupantsForHeating: number;
+  structuralCondition: number;
+  coldProtection: number;
+  repairProgress: number;
+  isCommunalShelter: boolean;
 }
 
 export interface Building {
@@ -111,6 +191,7 @@ export interface Building {
   condition: number;
   constructionProgress: number;
   ownerType: "private" | "public";
+  winter: WinterBuildingState;
 }
 
 export type VillageResources = ResourcePool;
@@ -122,6 +203,12 @@ export type VillageTaskType =
   | "carpentry_work"
   | "blacksmith_work"
   | "market_work"
+  | "process_firewood"
+  | "heat_home"
+  | "repair_shelter"
+  | "insulate_shelter"
+  | "care_sick"
+  | "migrate"
   | "carry_food_to_warehouse"
   | "eat_food"
   | "rest_at_home"
@@ -145,6 +232,99 @@ export interface DailyActivityMetrics {
   deaths: number;
   /** 당일 채집으로 모은 식량(야생 식량 한계 적용용, 매일 리셋). */
   foragedToday: number;
+  winterDeaths: number;
+  migrations: number;
+  careActions: number;
+  repairsCompleted: number;
+  insulationUpgrades: number;
+}
+
+export type WinterNeed =
+  | "warmth"
+  | "firewood"
+  | "winter_food"
+  | "shelter_repair"
+  | "insulation"
+  | "medicine"
+  | "migration";
+
+export interface WinterNeedState {
+  type: WinterNeed;
+  urgency: number;
+  currentSupply: number;
+  projectedDemand: number;
+  reasons: CitizenDecisionReason[];
+}
+
+export type ScenarioPhase = "preparation" | "winter" | "ended";
+
+export interface ScenarioEvent {
+  id: string;
+  day: number;
+  type:
+    | "cold_snap"
+    | "hypothermia"
+    | "repair"
+    | "insulation"
+    | "migration"
+    | "death"
+    | "winter_started"
+    | "winter_ended";
+  title: string;
+  description: string;
+  severity: "info" | "warning" | "critical" | "positive";
+  citizenId?: string;
+  buildingId?: string;
+}
+
+export interface ScenarioOutcome {
+  reason:
+    | "winter_survived"
+    | "all_dead_or_left"
+    | "village_abandoned"
+    | "all_migrated";
+  initialPopulation: number;
+  survivors: number;
+  deaths: number;
+  migrated: number;
+  careActions: number;
+  repairsCompleted: number;
+  insulationUpgrades: number;
+  sickResidents: number;
+  minimumTemperature: number;
+  minimumFood: number;
+  minimumFirewood: number;
+  vulnerableSurvivalRate: number;
+}
+
+export interface ScenarioRuntimeState {
+  scenarioId: string;
+  currentDay: number;
+  durationDays: number;
+  phase: ScenarioPhase;
+  currentTemperature: number;
+  apparentTemperature: number;
+  expectedMinimumTemperature: number;
+  minimumTemperature: number;
+  snowDepth: number;
+  windStrength: number;
+  winterStartDay: number;
+  daysUntilWinter: number;
+  villageHeatSecurity: number;
+  foodSecurityDays: number;
+  firewoodSecurityDays: number;
+  agricultureProductivity: number;
+  outdoorRisk: number;
+  initialPopulation: number;
+  deaths: number;
+  migrated: number;
+  careActions: number;
+  repairsCompleted: number;
+  insulationUpgrades: number;
+  minimumFood: number;
+  minimumFirewood: number;
+  events: ScenarioEvent[];
+  outcome?: ScenarioOutcome;
 }
 
 // --- 성장형 정착지: 수요·직업 창발·발전 단계 ---
@@ -266,6 +446,8 @@ export interface SimulationState {
   opportunities: ProfessionOpportunity[];
   /** 현재 발전 단계(상태 요약 결과값). */
   stage: SettlementStage;
+  scenario?: ScenarioRuntimeState;
+  winterNeeds: WinterNeedState[];
 }
 
 export interface SimulationSnapshot {
@@ -288,6 +470,8 @@ export interface SimulationSnapshot {
   stage: SettlementStage;
   needs: NeedState[];
   opportunities: ProfessionOpportunity[];
+  scenario?: ScenarioRuntimeState;
+  winterNeeds: WinterNeedState[];
   latestStatistics: DailyStatistics;
   statistics: DailyStatistics[];
   recentStatistics: DailyStatistics[];

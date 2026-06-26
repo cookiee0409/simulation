@@ -5,6 +5,13 @@ import {
   toolProductivityMultiplier,
 } from "../economy/IndustrySystem";
 import type { Building, Citizen, SimulationState } from "../types";
+import { convertWoodToFirewood } from "../survival/FirewoodSystem";
+import {
+  insulateBuilding,
+  repairBuilding,
+} from "../survival/BuildingInsulationSystem";
+import { recordScenarioEvent } from "../scenarios/ScenarioSystem";
+import { WINTER_BALANCE } from "../scenarios/mountainWinter/winterBalance";
 
 export class AgentExecutionSystem {
   updateCitizen(
@@ -40,6 +47,24 @@ export class AgentExecutionSystem {
         break;
       case "work_market":
         this.performMarket(citizen, state, config);
+        break;
+      case "process_firewood":
+        this.performFirewoodProcessing(citizen, state);
+        break;
+      case "heat_home":
+        this.performHeating(citizen, state);
+        break;
+      case "repair_shelter":
+        this.performShelterWork(citizen, state, day, "repair");
+        break;
+      case "insulate_shelter":
+        this.performShelterWork(citizen, state, day, "insulate");
+        break;
+      case "care_sick":
+        this.performCare(citizen, state);
+        break;
+      case "migrate":
+        this.performMigration(citizen, state, day);
         break;
       case "carry_food":
         this.performCarry(citizen, state, config);
@@ -96,6 +121,7 @@ export class AgentExecutionSystem {
       config.landFertility *
       productivity *
       toolProductivityMultiplier(state, config) *
+      (state.scenario?.agricultureProductivity ?? 1) *
       Math.max(
         0,
         1 +
@@ -174,7 +200,12 @@ export class AgentExecutionSystem {
         building.type === buildingType &&
         building.constructionProgress >= 100,
     );
-    if (!site || citizen.job !== requiredJob || !citizen.canWork) {
+    const canGather =
+      citizen.job === requiredJob ||
+      (resource === "wood" &&
+        state.scenario !== undefined &&
+        citizen.temporaryRole === "wood_gatherer");
+    if (!site || !canGather || !citizen.canWork) {
       fail(citizen);
       return;
     }
@@ -191,6 +222,9 @@ export class AgentExecutionSystem {
     const amount =
       yieldPerAction *
       productivity *
+      (resource === "wood"
+        ? 0.65 + citizen.skills.logging / 160
+        : 1) *
       toolProductivityMultiplier(state, config) *
       Math.max(
         0,
@@ -419,6 +453,147 @@ export class AgentExecutionSystem {
     complete(citizen);
   }
 
+  private performFirewoodProcessing(
+    citizen: Citizen,
+    state: SimulationState,
+  ): void {
+    citizen.actionProgress += 1 / 8;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    convertWoodToFirewood(
+      state,
+      1.2 + citizen.skills.logging / 100,
+    );
+    complete(citizen);
+  }
+
+  private performHeating(
+    citizen: Citizen,
+    state: SimulationState,
+  ): void {
+    const building = state.buildings.find(
+      (candidate) =>
+        candidate.id === citizen.targetId &&
+        candidate.type === "house",
+    );
+    if (!building || state.resources.firewood <= 0) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += 1 / 4;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    const transferred = Math.min(3, state.resources.firewood);
+    state.resources.firewood -= transferred;
+    building.winter.firewoodStored += transferred;
+    building.winter.heatingLevel = Math.max(
+      building.winter.heatingLevel,
+      0.75,
+    );
+    complete(citizen);
+  }
+
+  private performShelterWork(
+    citizen: Citizen,
+    state: SimulationState,
+    day: number,
+    type: "repair" | "insulate",
+  ): void {
+    const building = state.buildings.find(
+      (candidate) =>
+        candidate.id === citizen.targetId &&
+        candidate.type === "house",
+    );
+    if (!building) {
+      fail(citizen);
+      return;
+    }
+    const speed = 14 - Math.min(6, citizen.skills.construction / 18);
+    citizen.actionProgress += 1 / speed;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    const succeeded =
+      type === "repair"
+        ? repairBuilding(state, building, day)
+        : insulateBuilding(state, building, day);
+    succeeded ? complete(citizen) : fail(citizen);
+  }
+
+  private performCare(
+    citizen: Citizen,
+    state: SimulationState,
+  ): void {
+    const patient = state.citizens.find(
+      (candidate) => candidate.id === citizen.targetId,
+    );
+    if (!patient || patient.id === citizen.id) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += 1 / 10;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    const medicineBonus =
+      state.resources.medicine > 0 ? 1 : 0.45;
+    if (state.resources.medicine > 0) {
+      state.resources.medicine = Math.max(
+        0,
+        state.resources.medicine - 0.25,
+      );
+    }
+    const skill = 0.65 + citizen.skills.medicine / 130;
+    patient.winter.illness = Math.max(
+      0,
+      patient.winter.illness -
+        WINTER_BALANCE.illnessRecoveryWithCare *
+          medicineBonus *
+          skill,
+    );
+    patient.winter.bodyTemperature = Math.min(
+      36.8,
+      patient.winter.bodyTemperature + 0.25 * skill,
+    );
+    patient.health = Math.min(100, patient.health + 1.5 * skill);
+    state.dailyMetrics.careActions += 1;
+    if (state.scenario) {
+      state.scenario.careActions += 1;
+    }
+    complete(citizen);
+  }
+
+  private performMigration(
+    citizen: Citizen,
+    state: SimulationState,
+    day: number,
+  ): void {
+    citizen.actionProgress += 1 / 12;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    citizen.action = "leaving";
+    state.citizens = state.citizens.filter(
+      (candidate) => candidate.id !== citizen.id,
+    );
+    state.dailyMetrics.migrations += 1;
+    state.dailyMetrics.populationLost += 1;
+    if (state.scenario) {
+      state.scenario.migrated += 1;
+    }
+    recordScenarioEvent(state, {
+      type: "migration",
+      day,
+      title: "주민 이주",
+      description: `${citizen.id}이 생존을 위해 산길을 떠났습니다.`,
+      severity: "warning",
+      citizenId: citizen.id,
+    });
+    complete(citizen);
+  }
+
   private atWorkshop(
     citizen: Citizen,
     state: SimulationState,
@@ -481,6 +656,11 @@ function updateLegacyAction(citizen: Citizen): void {
     citizen.goal === "work_carpentry" ||
     citizen.goal === "work_blacksmith" ||
     citizen.goal === "work_market" ||
+    citizen.goal === "process_firewood" ||
+    citizen.goal === "heat_home" ||
+    citizen.goal === "repair_shelter" ||
+    citizen.goal === "insulate_shelter" ||
+    citizen.goal === "care_sick" ||
     citizen.goal === "build" ||
     citizen.goal === "carry_food"
   ) {

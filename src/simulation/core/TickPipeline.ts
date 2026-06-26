@@ -10,6 +10,7 @@ import { TaskBoardSystem } from "../tasks/TaskBoardSystem";
 import type { SimulationConfig } from "./SimulationConfig";
 import type { SeededRandom } from "./SeededRandom";
 import type { SimulationState } from "../types";
+import { updateBodyTemperatures } from "../survival/BodyTemperatureSystem";
 
 export class TickPipeline {
   readonly taskBoard = new TaskBoardSystem();
@@ -61,6 +62,7 @@ export class TickPipeline {
       this.movement.updateCitizen(citizen, state, config, random);
       this.execution.updateCitizen(citizen, state, config, day, random);
     }
+    updateBodyTemperatures(state, config);
     synchronizeVillageFood(state);
   }
 }

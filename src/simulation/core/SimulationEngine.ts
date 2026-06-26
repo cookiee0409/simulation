@@ -10,6 +10,7 @@ import { SeededRandom } from "./SeededRandom";
 import {
   createDefaultSystems,
   createEmptyFoodResult,
+  createScenarioSystems,
   type SimulationSystem,
 } from "./SystemPipeline";
 import { TickPipeline } from "./TickPipeline";
@@ -19,6 +20,13 @@ import { synchronizeVillageFood } from "../economy/FoodSystem";
 import { GridPathfinder } from "../pathfinding/GridPathfinder";
 import { createCitizens } from "../population/PopulationFactory";
 import { updateNeeds } from "../needs/NeedSystem";
+import type { ScenarioDefinition } from "../scenarios/ScenarioDefinition";
+import { createScenarioRuntime } from "../scenarios/ScenarioSystem";
+import {
+  initializeMountainWinterState,
+  scenarioConfigOverrides,
+} from "../scenarios/mountainWinter/MountainWinterSetup";
+import { updateWinterNeeds } from "../survival/WinterNeedSystem";
 import { computeSettlementStage } from "../settlement/SettlementStageSystem";
 import {
   createDailyStatistics,
@@ -42,9 +50,19 @@ export class SimulationEngine {
   private readonly dailySystems: SimulationSystem[];
   private readonly pathfinder: GridPathfinder;
   private readonly tickPipeline: TickPipeline;
+  private readonly scenarioDefinition?: ScenarioDefinition;
 
-  constructor(configOverrides: Partial<SimulationConfig> = {}) {
-    const base = createSimulationConfig(configOverrides);
+  constructor(
+    configOverrides: Partial<SimulationConfig> = {},
+    scenarioDefinition?: ScenarioDefinition,
+  ) {
+    this.scenarioDefinition = scenarioDefinition;
+    const base = createSimulationConfig({
+      ...(scenarioDefinition
+        ? scenarioConfigOverrides(scenarioDefinition)
+        : {}),
+      ...configOverrides,
+    });
     const landRandom = new SeededRandom(`${base.seed}:land`);
     const landFertility = landRandom.between(
       base.landFertilityMin,
@@ -61,7 +79,9 @@ export class SimulationEngine {
       this.config.ticksPerDay,
       this.config.minutesPerTick,
     );
-    this.dailySystems = createDefaultSystems();
+    this.dailySystems = scenarioDefinition
+      ? createScenarioSystems(scenarioDefinition)
+      : createDefaultSystems();
     this.pathfinder = new GridPathfinder(this.config);
     this.tickPipeline = new TickPipeline(this.pathfinder);
 
@@ -84,13 +104,30 @@ export class SimulationEngine {
         births: 0,
         deaths: 0,
         foragedToday: 0,
+        winterDeaths: 0,
+        migrations: 0,
+        careActions: 0,
+        repairsCompleted: 0,
+        insulationUpgrades: 0,
       },
       mapRevision: 0,
       nextCitizenSerial: citizens.length + 1,
       needs: [],
+      winterNeeds: [],
       opportunities: [],
       stage: "camp",
+      scenario: scenarioDefinition
+        ? createScenarioRuntime(scenarioDefinition)
+        : undefined,
     };
+    if (scenarioDefinition) {
+      initializeMountainWinterState(
+        this.state,
+        scenarioDefinition,
+        this.random,
+      );
+      updateWinterNeeds(this.state, this.config);
+    }
     synchronizeVillageFood(this.state);
     updateNeeds(this.state, this.config);
     this.state.stage = computeSettlementStage(this.state);
@@ -191,6 +228,8 @@ export class SimulationEngine {
           ...reason,
         })),
         traits: { ...citizen.traits },
+        skills: { ...citizen.skills },
+        winter: { ...citizen.winter },
       })),
       buildings: this.state.buildings.map((building) => ({
         ...building,
@@ -198,6 +237,7 @@ export class SimulationEngine {
         entrance: { ...building.entrance },
         workers: [...building.workers],
         inventory: { ...building.inventory },
+        winter: { ...building.winter },
       })),
       resources: { ...this.state.resources },
       tasks: this.state.tasks.map((task) => ({
@@ -215,6 +255,21 @@ export class SimulationEngine {
         ...need,
         causes: need.causes.map((cause) => ({ ...cause })),
       })),
+      winterNeeds: this.state.winterNeeds.map((need) => ({
+        ...need,
+        reasons: need.reasons.map((reason) => ({ ...reason })),
+      })),
+      scenario: this.state.scenario
+        ? {
+            ...this.state.scenario,
+            events: this.state.scenario.events.map((event) => ({
+              ...event,
+            })),
+            outcome: this.state.scenario.outcome
+              ? { ...this.state.scenario.outcome }
+              : undefined,
+          }
+        : undefined,
       opportunities: this.state.opportunities.map((opportunity) => ({
         ...opportunity,
         relatedNeeds: [...opportunity.relatedNeeds],
@@ -253,6 +308,11 @@ export class SimulationEngine {
       births: 0,
       deaths: 0,
       foragedToday: 0,
+      winterDeaths: 0,
+      migrations: 0,
+      careActions: 0,
+      repairsCompleted: 0,
+      insulationUpgrades: 0,
     };
     return { ...statistics };
   }

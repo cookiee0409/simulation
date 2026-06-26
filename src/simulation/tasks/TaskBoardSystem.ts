@@ -9,6 +9,8 @@ import type {
   VillageTask,
   VillageTaskType,
 } from "../types";
+import { WINTER_BALANCE } from "../scenarios/mountainWinter/winterBalance";
+import { updateWinterNeeds } from "../survival/WinterNeedSystem";
 
 export class TaskBoardSystem {
   update(
@@ -16,6 +18,9 @@ export class TaskBoardSystem {
     config: SimulationConfig,
     random: SeededRandom,
   ): void {
+    if (state.scenario) {
+      updateWinterNeeds(state, config);
+    }
     this.ensureConstructionSite(state, config, random);
     const aliveIds = new Set(state.citizens.map((citizen) => citizen.id));
     const previousAssignments = new Map(
@@ -177,9 +182,138 @@ export class TaskBoardSystem {
     addWorkshopTasks(tasks, state, "carpentry", "carpentry_work", 54, previousAssignments);
     addWorkshopTasks(tasks, state, "blacksmith", "blacksmith_work", 52, previousAssignments);
     addWorkshopTasks(tasks, state, "market", "market_work", 48, previousAssignments);
+    if (state.scenario) {
+      this.addWinterTasks(tasks, state, previousAssignments);
+    }
 
     state.tasks = tasks;
     this.removeInvalidAssignments(state);
+  }
+
+  private addWinterTasks(
+    tasks: VillageTask[],
+    state: SimulationState,
+    previousAssignments: Map<string, string[]>,
+  ): void {
+    const urgency = (type: string) =>
+      state.winterNeeds.find((need) => need.type === type)?.urgency ?? 0;
+    const warehouse = state.buildings.find(
+      (building) =>
+        building.type === "warehouse" &&
+        building.constructionProgress >= 100,
+    );
+    if (warehouse && state.resources.wood >= 0.5) {
+      tasks.push(
+        createTask(
+          "process-firewood",
+          "process_firewood",
+          warehouse.id,
+          warehouse.entrance,
+          60 + urgency("firewood") * 0.45,
+          3,
+          previousAssignments,
+        ),
+      );
+    }
+
+    for (const house of state.buildings
+      .filter(
+        (building) =>
+          building.type === "house" &&
+          building.constructionProgress >= 100,
+      )
+      .sort((left, right) => left.id.localeCompare(right.id))) {
+      if (
+        state.resources.firewood > 0 &&
+        (house.winter.firewoodStored < 2 ||
+          house.winter.heatingLevel < 0.65)
+      ) {
+        tasks.push(
+          createTask(
+            `heat-home:${house.id}`,
+            "heat_home",
+            house.id,
+            house.entrance,
+            64 + urgency("warmth") * 0.45,
+            1,
+            previousAssignments,
+          ),
+        );
+      }
+      if (
+        house.winter.structuralCondition < 82 &&
+        state.resources.wood >= WINTER_BALANCE.repairWoodCost &&
+        state.resources.stone >= WINTER_BALANCE.repairStoneCost
+      ) {
+        tasks.push(
+          createTask(
+            `repair-shelter:${house.id}`,
+            "repair_shelter",
+            house.id,
+            house.entrance,
+            55 + urgency("shelter_repair") * 0.5,
+            2,
+            previousAssignments,
+          ),
+        );
+      }
+      if (
+        house.winter.insulation < 72 &&
+        state.resources.wood >= WINTER_BALANCE.insulationWoodCost
+      ) {
+        tasks.push(
+          createTask(
+            `insulate-shelter:${house.id}`,
+            "insulate_shelter",
+            house.id,
+            house.entrance,
+            52 + urgency("insulation") * 0.5,
+            2,
+            previousAssignments,
+          ),
+        );
+      }
+    }
+
+    for (const patient of state.citizens
+      .filter(
+        (citizen) =>
+          citizen.winter.illness >= 25 ||
+          citizen.winter.bodyTemperature < 35.2,
+      )
+      .sort((left, right) => left.id.localeCompare(right.id))) {
+      tasks.push(
+        createTask(
+          `care-sick:${patient.id}`,
+          "care_sick",
+          patient.id,
+          patient.position,
+          68 + urgency("medicine") * 0.42,
+          1,
+          previousAssignments,
+        ),
+      );
+    }
+
+    if (
+      state.scenario &&
+      (urgency("migration") >= 48 ||
+        (state.scenario.phase === "winter" &&
+          state.scenario.apparentTemperature <= -18)) &&
+      state.scenario.phase !== "ended"
+    ) {
+      tasks.push(
+        createTask(
+          "individual-migration",
+          "migrate",
+          "mountain-pass",
+          WINTER_BALANCE.migrationExit,
+          35 + urgency("migration") * 0.55,
+          state.citizens.length,
+          previousAssignments,
+        ),
+      );
+    }
   }
 
   assignCitizen(

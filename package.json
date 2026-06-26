@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "simulate:100": "tsx scripts/run-headless.ts"
+    "simulate:100": "tsx scripts/run-headless.ts",
+    "simulate:winter": "tsx scripts/run-winter-scenario.ts",
+    "simulate:winter:multi": "tsx scripts/run-winter-multi-seed.ts"
   },
   "dependencies": {
     "phaser": "^3.90.0",

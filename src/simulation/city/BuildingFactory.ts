@@ -125,6 +125,27 @@ export function createBuilding(
     condition: 100,
     constructionProgress,
     ownerType: type === "warehouse" ? "public" : "private",
+    winter: {
+      insulation:
+        type === "house"
+          ? random.between(28, 68)
+          : type === "warehouse"
+            ? random.between(35, 58)
+            : 20,
+      indoorTemperature: 10,
+      heatingLevel: 0,
+      firewoodStored: 0,
+      maxOccupantsForHeating:
+        type === "house"
+          ? Math.max(2, capacity)
+          : type === "warehouse"
+            ? 16
+            : capacity,
+      structuralCondition: random.between(55, 92),
+      coldProtection: 30,
+      repairProgress: 0,
+      isCommunalShelter: false,
+    },
   };
 }
 

@@ -12,6 +12,7 @@ export {
   type SimulationSpeed,
 } from "./core/SimulationClock";
 export { SeededRandom } from "./core/SeededRandom";
+export { mountainWinterScenario } from "./scenarios/mountainWinter/mountainWinterScenario";
 export type {
   SimulationSystem,
   SystemContext,
@@ -39,12 +40,17 @@ export {
   type CitizenActionState,
   type CitizenDecisionReason,
   type CitizenGoal,
+  type CitizenSkills,
+  type CitizenTraits,
   type DailyStatistics,
   type GridPosition,
   type PathfindingStatistics,
   type ResourcePool,
   type ResourceType,
   type SimulationSnapshot,
+  type ScenarioOutcome,
+  type ScenarioRuntimeState,
+  type WinterNeedState,
   type VillageTask,
   type VillageTaskType,
 } from "./types";

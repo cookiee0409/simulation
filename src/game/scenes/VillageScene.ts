@@ -121,7 +121,17 @@ export class VillageScene extends Phaser.Scene {
     const width = this.snapshot?.mapWidth ?? 760;
     const height = this.snapshot?.mapHeight ?? 520;
     this.terrain.clear();
-    this.terrain.fillStyle(COLORS.ground, 1);
+    const winter = this.snapshot?.scenario;
+    const coldRatio = winter
+      ? Phaser.Math.Clamp((5 - winter.currentTemperature) / 30, 0, 1)
+      : 0;
+    const groundColor = Phaser.Display.Color.Interpolate.ColorWithColor(
+      Phaser.Display.Color.ValueToColor(COLORS.ground),
+      Phaser.Display.Color.ValueToColor(0xdce8ed),
+      100,
+      Math.round(coldRatio * 100),
+    ).color;
+    this.terrain.fillStyle(groundColor, 1);
     this.terrain.fillRect(0, 0, width, height);
     this.terrain.fillStyle(0x7aae6c, 0.7);
     const count = Math.floor((width * height) / 14000);
@@ -129,6 +139,15 @@ export class VillageScene extends Phaser.Scene {
       const x = 18 + ((index * 83) % (width - 36));
       const y = 35 + ((index * 47) % (height - 70));
       this.terrain.fillCircle(x, y, 4 + (index % 3));
+    }
+    if (winter && winter.snowDepth > 0.5) {
+      this.terrain.fillStyle(0xffffff, 0.72);
+      const snowflakes = Math.min(90, Math.round(winter.snowDepth * 5));
+      for (let index = 0; index < snowflakes; index += 1) {
+        const x = (index * 97 + snapshotHash(this.snapshot!.seed)) % width;
+        const y = (index * 53 + snapshotHash(this.snapshot!.seed) * 3) % height;
+        this.terrain.fillCircle(x, y, 1 + (index % 2));
+      }
     }
   }
 
@@ -194,6 +213,11 @@ export class VillageScene extends Phaser.Scene {
         this.addBuildingLabel(
           building,
           `건설 ${Math.round(building.constructionProgress)}%`,
+        );
+      } else if (this.snapshot?.scenario) {
+        this.addBuildingLabel(
+          building,
+          `${building.winter.indoorTemperature.toFixed(0)}° · 단열 ${Math.round(building.winter.insulation)} · 🔥${building.winter.firewoodStored.toFixed(1)}`,
         );
       }
     } else if (building.type === "lumberjack") {
@@ -376,4 +400,12 @@ export class VillageScene extends Phaser.Scene {
 
 function formatFood(value: number): string {
   return Math.round(value * 10) / 10 + "";
+}
+
+function snapshotHash(seed: string): number {
+  let hash = 0;
+  for (const character of seed) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  return hash;
 }
