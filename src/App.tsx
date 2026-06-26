@@ -41,6 +41,8 @@ const GOAL_LABELS: Record<Citizen["goal"], string> = {
   insulate_shelter: "단열 보강",
   care_sick: "환자 돌봄",
   migrate: "개인 이주",
+  forge_tools: "도구 제작",
+  trade_supplies: "교역",
   carry_food: "식량 운반",
   rest: "휴식",
   return_home: "귀가",

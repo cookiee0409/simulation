@@ -257,6 +257,28 @@ export function chooseGoal(
       ];
       candidates.push(candidate("care_sick", task, reasons));
     }
+    for (const task of tasksByType("forge_tools")) {
+      const isSmith = citizen.job === "blacksmith";
+      const reasons = [
+        reason("대장장이 직업", isSmith ? 86 : 8),
+        reason("연장·건축 기술", citizen.skills.construction * 0.4),
+        reason("준비기 여유", perception.scenario.phase === "preparation" ? 22 : 0),
+        reason("피로", -citizen.fatigue * 0.18),
+        reason("배고픔", -citizen.hunger * 0.2),
+      ];
+      candidates.push(candidate("forge_tools", task, reasons));
+    }
+    for (const task of tasksByType("trade_supplies")) {
+      const isMerchant = citizen.job === "merchant";
+      const reasons = [
+        reason("상인 직업", isMerchant ? 88 : 8),
+        reason("교섭 기술", citizen.skills.negotiation * 0.42),
+        reason("전문 분야", specialtyBonus(citizen, "negotiation", 16)),
+        reason("보급 필요", winterUrgency("winter_food") * 0.22),
+        reason("피로", -citizen.fatigue * 0.16),
+      ];
+      candidates.push(candidate("trade_supplies", task, reasons));
+    }
     if (perception.day >= 4) {
       for (const task of tasksByType("migrate")) {
         const migrationIntent = clamp(

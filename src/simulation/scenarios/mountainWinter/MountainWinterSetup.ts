@@ -2,6 +2,7 @@ import type { SimulationConfig } from "../../core/SimulationConfig";
 import type { SeededRandom } from "../../core/SeededRandom";
 import type { Citizen, CitizenJob, SimulationState } from "../../types";
 import type { ScenarioDefinition } from "../ScenarioDefinition";
+import { createBuilding } from "../../city/BuildingFactory";
 
 export function scenarioConfigOverrides(
   definition: ScenarioDefinition,
@@ -54,6 +55,39 @@ export function initializeMountainWinterState(
       ? `household-${citizen.homeId}`
       : `household-${Math.floor(index / 4) + 1}`;
   }
+
+  addWinterWorkshops(state, random);
+}
+
+/**
+ * 작업 영역 안에 전용 시설을 세운다. 대장간은 도구를, 교역소는 외부 행상과의
+ * 교환을 담당한다. 울타리·동선과 겹치지 않도록 영역 내부에 배치한다.
+ */
+function addWinterWorkshops(
+  state: SimulationState,
+  random: SeededRandom,
+): void {
+  const work = state.layout?.zones.find((zone) => zone.type === "work");
+  if (!work) {
+    return;
+  }
+  const at = (fx: number, fy: number) => ({
+    x: Math.round((work.rect.x + work.rect.width * fx) / 20) * 20,
+    y: Math.round((work.rect.y + work.rect.height * fy) / 20) * 20,
+  });
+  const specs: Array<{ type: "blacksmith" | "market"; pos: { x: number; y: number } }> = [
+    { type: "blacksmith", pos: at(0.32, 0.62) },
+    { type: "market", pos: at(0.68, 0.62) },
+  ];
+  for (const spec of specs) {
+    if (state.buildings.some((b) => b.type === spec.type)) {
+      continue;
+    }
+    state.buildings.push(
+      createBuilding(spec.type, 0, 3, random, undefined, 100, spec.pos),
+    );
+  }
+  state.mapRevision += 1;
 }
 
 function dominantSkill(skills: Citizen["skills"]): Citizen["specialty"] {

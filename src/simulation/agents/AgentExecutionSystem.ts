@@ -66,6 +66,12 @@ export class AgentExecutionSystem {
       case "migrate":
         this.performMigration(citizen, state, day);
         break;
+      case "forge_tools":
+        this.performForge(citizen, state, config);
+        break;
+      case "trade_supplies":
+        this.performTrade(citizen, state, config);
+        break;
       case "carry_food":
         this.performCarry(citizen, state, config);
         break;
@@ -530,10 +536,20 @@ export class AgentExecutionSystem {
       return;
     }
     const beforeFirewood = state.resources.firewood;
+    // 도구가 비축돼 있으면 가공 효율이 오르고, 도구는 조금씩 마모된다.
+    const toolFactor =
+      1 + toolReadiness(state) * WINTER_BALANCE.toolFirewoodBonus;
+    if (state.resources.tools > 0) {
+      state.resources.tools = Math.max(
+        0,
+        state.resources.tools - WINTER_BALANCE.toolWearPerUse,
+      );
+    }
     convertWoodToFirewood(
       state,
       (1.2 + citizen.skills.logging / 100) *
-        skillMultiplier(citizen, "logging", 0.25),
+        skillMultiplier(citizen, "logging", 0.25) *
+        toolFactor,
     );
     const produced = state.resources.firewood - beforeFirewood;
     if (produced > 0) {
@@ -545,6 +561,84 @@ export class AgentExecutionSystem {
         resource: "firewood",
       });
     }
+    complete(citizen);
+  }
+
+  private performForge(
+    citizen: Citizen,
+    state: SimulationState,
+    _config: SimulationConfig,
+  ): void {
+    const forge = state.buildings.find(
+      (building) =>
+        building.id === citizen.targetId &&
+        building.type === "blacksmith" &&
+        building.constructionProgress >= 100,
+    );
+    if (
+      !forge ||
+      state.resources.stone <
+        WINTER_BALANCE.forgeStoneCost + WINTER_BALANCE.stoneReserveForRepair
+    ) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += skillMultiplier(citizen, "construction", 0.5) / 9;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    state.resources.stone -= WINTER_BALANCE.forgeStoneCost;
+    const made =
+      WINTER_BALANCE.forgeToolsPerAction *
+      skillMultiplier(citizen, "construction", 0.3);
+    state.resources.tools = Math.min(
+      WINTER_BALANCE.toolsStockCap,
+      state.resources.tools + made,
+    );
+    pushVisualEvent(state, {
+      position: forge.position,
+      icon: "🔨",
+      label: `도구 +${formatAmount(made)}`,
+      resource: "tools",
+    });
+    complete(citizen);
+  }
+
+  private performTrade(
+    citizen: Citizen,
+    state: SimulationState,
+    _config: SimulationConfig,
+  ): void {
+    const market = state.buildings.find(
+      (building) =>
+        building.id === citizen.targetId &&
+        building.type === "market" &&
+        building.constructionProgress >= 100,
+    );
+    const canTrade =
+      market &&
+      state.resources.stone >=
+        WINTER_BALANCE.tradeSurplusStoneFloor + WINTER_BALANCE.tradeStoneGiven;
+    if (!canTrade) {
+      fail(citizen);
+      return;
+    }
+    citizen.actionProgress += skillMultiplier(citizen, "negotiation", 0.5) / 7;
+    if (citizen.actionProgress < 1) {
+      return;
+    }
+    // 외부 행상과 교환: 남는 돌을 내주고 식량·땔감·의약품을 받는다.
+    state.resources.stone -= WINTER_BALANCE.tradeStoneGiven;
+    const dealFactor = skillMultiplier(citizen, "negotiation", 0.35);
+    state.resources.food += WINTER_BALANCE.tradeFoodGained * dealFactor;
+    state.resources.firewood += WINTER_BALANCE.tradeFirewoodGained * dealFactor;
+    state.resources.medicine += WINTER_BALANCE.tradeMedicineGained * dealFactor;
+    pushVisualEvent(state, {
+      position: market!.position,
+      icon: "🛒",
+      label: "교역",
+      resource: "food",
+    });
     complete(citizen);
   }
 
@@ -782,6 +876,11 @@ function fail(citizen: Citizen): void {
   citizen.pathIndex = 0;
 }
 
+/** 도구 비축 준비도(0~1). 대장간 산출에 따라 1차 작업 효율이 오른다. */
+function toolReadiness(state: SimulationState): number {
+  return Math.min(1, state.resources.tools / WINTER_BALANCE.toolsStockCap);
+}
+
 function updateLegacyAction(citizen: Citizen): void {
   if (citizen.actionState === "moving") {
     citizen.action = "working";
@@ -800,6 +899,8 @@ function updateLegacyAction(citizen: Citizen): void {
     citizen.goal === "repair_shelter" ||
     citizen.goal === "insulate_shelter" ||
     citizen.goal === "care_sick" ||
+    citizen.goal === "forge_tools" ||
+    citizen.goal === "trade_supplies" ||
     citizen.goal === "build" ||
     citizen.goal === "carry_food"
   ) {

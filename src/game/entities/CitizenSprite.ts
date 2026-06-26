@@ -16,6 +16,8 @@ const GOAL_ICONS: Record<Citizen["goal"], string> = {
   insulate_shelter: "🧱",
   care_sick: "🩺",
   migrate: "🚶",
+  forge_tools: "🔨",
+  trade_supplies: "🛒",
   carry_food: "📦",
   rest: "💤",
   return_home: "🏠",

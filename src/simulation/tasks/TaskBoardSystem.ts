@@ -296,6 +296,63 @@ export class TaskBoardSystem {
       );
     }
 
+    // 대장간: 도구가 부족하면 나무·돌로 도구를 만든다(땔감·수리 효율↑).
+    const forge = state.buildings.find(
+      (building) =>
+        building.type === "blacksmith" &&
+        building.constructionProgress >= 100,
+    );
+    if (
+      forge &&
+      state.resources.tools < WINTER_BALANCE.toolsStockCap &&
+      state.resources.stone >=
+        WINTER_BALANCE.forgeStoneCost + WINTER_BALANCE.stoneReserveForRepair
+    ) {
+      tasks.push(
+        createTask(
+          "forge-tools",
+          "forge_tools",
+          forge.id,
+          forge.entrance,
+          46 + urgency("firewood") * 0.2 + urgency("shelter_repair") * 0.2,
+          1,
+          previousAssignments,
+        ),
+      );
+    }
+
+    // 교역소: 잉여 나무·돌을 외부 행상과 교환해 식량·땔감·의약품을 들여온다.
+    const market = state.buildings.find(
+      (building) =>
+        building.type === "market" && building.constructionProgress >= 100,
+    );
+    if (
+      market &&
+      state.resources.stone >=
+        WINTER_BALANCE.tradeSurplusStoneFloor + WINTER_BALANCE.tradeStoneGiven &&
+      (urgency("winter_food") >= 20 ||
+        urgency("firewood") >= 20 ||
+        urgency("medicine") >= 20)
+    ) {
+      tasks.push(
+        createTask(
+          "trade-supplies",
+          "trade_supplies",
+          market.id,
+          market.entrance,
+          44 +
+            Math.max(
+              urgency("winter_food"),
+              urgency("firewood"),
+              urgency("medicine"),
+            ) *
+              0.4,
+          1,
+          previousAssignments,
+        ),
+      );
+    }
+
     if (
       state.scenario &&
       (urgency("migration") >= 48 ||
