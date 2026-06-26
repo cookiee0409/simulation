@@ -73,6 +73,14 @@ export interface CitizenSkills {
   leadership: number;
 }
 
+export type CitizenSkillName = keyof CitizenSkills;
+
+export interface CitizenThought {
+  label: string;
+  urgency: number;
+  reason: "hunger" | "cold" | "fatigue" | "illness" | "low_health" | "migration";
+}
+
 export type TemporaryRole =
   | "wood_gatherer"
   | "food_gatherer"
@@ -111,6 +119,8 @@ export interface Citizen {
   groupId: string;
   traits: CitizenTraits;
   skills: CitizenSkills;
+  specialty: CitizenSkillName;
+  thought?: CitizenThought;
   temporaryRole?: TemporaryRole;
   winter: WinterCitizenState;
   fatigue: number;
@@ -121,6 +131,7 @@ export interface Citizen {
   targetPosition?: GridPosition;
   path: GridPosition[];
   pathIndex: number;
+  movementBudget: number;
   actionProgress: number;
   decisionCooldown: number;
   decisionScore: number;
@@ -430,6 +441,33 @@ export interface PathfindingStatistics {
   cacheSize: number;
 }
 
+export type VillageZoneType = "farm" | "residential" | "work" | "storage";
+
+export interface VillageZone {
+  id: string;
+  type: VillageZoneType;
+  label: string;
+  rect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  gate: GridPosition;
+}
+
+export interface VillageLayout {
+  zones: VillageZone[];
+}
+
+export interface VisualEffectEvent {
+  id: string;
+  position: GridPosition;
+  icon: string;
+  label: string;
+  resource?: ResourceType | "construction" | "care" | "heat";
+}
+
 export interface SimulationState {
   citizens: Citizen[];
   buildings: Building[];
@@ -448,6 +486,9 @@ export interface SimulationState {
   stage: SettlementStage;
   scenario?: ScenarioRuntimeState;
   winterNeeds: WinterNeedState[];
+  layout: VillageLayout;
+  visualEvents: VisualEffectEvent[];
+  nextVisualEventSerial: number;
 }
 
 export interface SimulationSnapshot {
@@ -472,6 +513,8 @@ export interface SimulationSnapshot {
   opportunities: ProfessionOpportunity[];
   scenario?: ScenarioRuntimeState;
   winterNeeds: WinterNeedState[];
+  layout: VillageLayout;
+  visualEvents: VisualEffectEvent[];
   latestStatistics: DailyStatistics;
   statistics: DailyStatistics[];
   recentStatistics: DailyStatistics[];

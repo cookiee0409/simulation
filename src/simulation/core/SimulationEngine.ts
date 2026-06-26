@@ -19,6 +19,11 @@ import { calculateBuildingDemand } from "../city/BuildingDemandSystem";
 import { synchronizeVillageFood } from "../economy/FoodSystem";
 import { GridPathfinder } from "../pathfinding/GridPathfinder";
 import { createCitizens } from "../population/PopulationFactory";
+import {
+  cloneVillageLayout,
+  createFenceBlockedCells,
+  createVillageLayout,
+} from "../map/VillageLayout";
 import { updateNeeds } from "../needs/NeedSystem";
 import type { ScenarioDefinition } from "../scenarios/ScenarioDefinition";
 import { createScenarioRuntime } from "../scenarios/ScenarioSystem";
@@ -82,7 +87,11 @@ export class SimulationEngine {
     this.dailySystems = scenarioDefinition
       ? createScenarioSystems(scenarioDefinition)
       : createDefaultSystems();
-    this.pathfinder = new GridPathfinder(this.config);
+    const layout = createVillageLayout(this.config);
+    this.pathfinder = new GridPathfinder(
+      this.config,
+      scenarioDefinition ? createFenceBlockedCells(layout, this.config) : [],
+    );
     this.tickPipeline = new TickPipeline(this.pathfinder);
 
     const buildings = createInitialBuildings(this.config, this.random);
@@ -119,7 +128,13 @@ export class SimulationEngine {
       scenario: scenarioDefinition
         ? createScenarioRuntime(scenarioDefinition)
         : undefined,
+      layout,
+      visualEvents: [],
+      nextVisualEventSerial: 1,
     };
+    if (this.state.scenario) {
+      this.state.scenario.initialPopulation = citizens.length;
+    }
     if (scenarioDefinition) {
       initializeMountainWinterState(
         this.state,
@@ -229,6 +244,7 @@ export class SimulationEngine {
         })),
         traits: { ...citizen.traits },
         skills: { ...citizen.skills },
+        thought: citizen.thought ? { ...citizen.thought } : undefined,
         winter: { ...citizen.winter },
       })),
       buildings: this.state.buildings.map((building) => ({
@@ -258,6 +274,11 @@ export class SimulationEngine {
       winterNeeds: this.state.winterNeeds.map((need) => ({
         ...need,
         reasons: need.reasons.map((reason) => ({ ...reason })),
+      })),
+      layout: cloneVillageLayout(this.state.layout),
+      visualEvents: this.state.visualEvents.map((event) => ({
+        ...event,
+        position: { ...event.position },
       })),
       scenario: this.state.scenario
         ? {

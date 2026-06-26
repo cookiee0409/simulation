@@ -278,8 +278,9 @@ export class TaskBoardSystem {
     for (const patient of state.citizens
       .filter(
         (citizen) =>
-          citizen.winter.illness >= 25 ||
-          citizen.winter.bodyTemperature < 35.2,
+          citizen.winter.illness >= 12 ||
+          citizen.winter.bodyTemperature < 36.0 ||
+          citizen.health < 72,
       )
       .sort((left, right) => left.id.localeCompare(right.id))) {
       tasks.push(

@@ -8,9 +8,23 @@ import {
   type SimulationSnapshot,
   type SimulationSpeed,
 } from "./simulation";
+import type { ScenarioDefinition } from "./simulation/scenarios/ScenarioDefinition";
 import "./styles.css";
 
 const DEFAULT_SEED = "mountain-winter-001";
+const DEFAULT_SETTINGS: SetupSettings = {
+  seed: DEFAULT_SEED,
+  npcCount: 10,
+  winterStartDay: 20,
+  winterEndDay: 55,
+};
+
+interface SetupSettings {
+  seed: string;
+  npcCount: number;
+  winterStartDay: number;
+  winterEndDay: number;
+}
 
 const GOAL_LABELS: Record<Citizen["goal"], string> = {
   eat: "식사",
@@ -47,11 +61,13 @@ const JOB_LABELS: Record<Citizen["job"], string> = {
 };
 
 export default function App() {
-  const engineRef = useRef(createEngine());
+  const engineRef = useRef(createEngine(DEFAULT_SETTINGS, true));
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() =>
     engineRef.current.getSnapshot(),
   );
   const [selectedCitizenId, setSelectedCitizenId] = useState<string>();
+  const [setup, setSetup] = useState<SetupSettings>(DEFAULT_SETTINGS);
+  const [activeSetup, setActiveSetup] = useState<SetupSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     let frameId = 0;
@@ -80,15 +96,26 @@ export default function App() {
   const sickResidents = snapshot.citizens.filter(
     (citizen) => citizen.winter.illness >= 25,
   ).length;
+  const houseCount = snapshot.buildings.filter(
+    (building) => building.type === "house",
+  ).length;
 
   const setSpeed = (speed: SimulationSpeed) => {
     engineRef.current.setSpeed(speed);
     refresh();
   };
   const reset = () => {
-    engineRef.current = createEngine();
+    engineRef.current = createEngine(activeSetup, true);
     setSelectedCitizenId(undefined);
     refresh();
+  };
+  const applySetup = () => {
+    const next = sanitizeSetup(setup);
+    setSetup(next);
+    setActiveSetup(next);
+    engineRef.current = createEngine(next, false);
+    setSelectedCitizenId(undefined);
+    setSnapshot(engineRef.current.getSnapshot());
   };
 
   return (
@@ -98,7 +125,8 @@ export default function App() {
           <p className="eyebrow">MOUNTAIN WINTER · SEED {snapshot.seed}</p>
           <h1>혹한이 다가오는 산골 마을</h1>
           <p className="subtitle">
-            20일 동안 겨울을 준비하고, 이어지는 35일의 혹한을 견디세요.
+            {activeSetup.winterStartDay}일 동안 겨울을 준비하고,
+            이어지는 {activeSetup.winterEndDay - activeSetup.winterStartDay}일의 혹한을 견디세요.
             주민들은 상황과 성향에 따라 스스로 일하고 돌보거나 떠납니다.
           </p>
         </div>
@@ -112,6 +140,71 @@ export default function App() {
           </small>
         </div>
       </header>
+
+      <section className="setup-panel" aria-label="시뮬레이션 시작 설정">
+        <div>
+          <p className="eyebrow">SETUP</p>
+          <h2>시작 전 세부 설정</h2>
+          <p>NPC 수, 혹한기 시작/종료일, 시드를 바꾸고 새 시뮬레이션을 시작합니다.</p>
+        </div>
+        <label>
+          <span>시드</span>
+          <input
+            value={setup.seed}
+            onChange={(event) =>
+              setSetup((current) => ({ ...current, seed: event.target.value }))
+            }
+          />
+        </label>
+        <label>
+          <span>NPC 수</span>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={setup.npcCount}
+            onChange={(event) =>
+              setSetup((current) => ({
+                ...current,
+                npcCount: Number(event.target.value),
+              }))
+            }
+          />
+        </label>
+        <label>
+          <span>혹한 시작일</span>
+          <input
+            type="number"
+            min={1}
+            max={180}
+            value={setup.winterStartDay}
+            onChange={(event) =>
+              setSetup((current) => ({
+                ...current,
+                winterStartDay: Number(event.target.value),
+              }))
+            }
+          />
+        </label>
+        <label>
+          <span>종료일</span>
+          <input
+            type="number"
+            min={2}
+            max={240}
+            value={setup.winterEndDay}
+            onChange={(event) =>
+              setSetup((current) => ({
+                ...current,
+                winterEndDay: Number(event.target.value),
+              }))
+            }
+          />
+        </label>
+        <button className="primary" type="button" onClick={applySetup}>
+          설정 적용 후 시작
+        </button>
+      </section>
 
       <section className="dashboard">
         <div className="village-panel">
@@ -141,7 +234,7 @@ export default function App() {
             <Metric label="땔감" value={format(snapshot.resources.firewood)} warning={snapshot.resources.firewood < 8} />
             <Metric label="원목" value={format(snapshot.resources.wood)} />
             <Metric label="의약품" value={format(snapshot.resources.medicine)} />
-            <Metric label="난방 주택" value={`${heatedHouses}/6`} />
+            <Metric label="난방 주택" value={`${heatedHouses}/${houseCount}`} />
             <Metric label="이주" value={`${scenario?.migrated ?? 0}명`} />
           </div>
 
@@ -179,14 +272,53 @@ export default function App() {
         </div>
         <button type="button" onClick={() => { engineRef.current.stepTick(); refresh(); }}>+ 10분</button>
         <button type="button" onClick={() => { engineRef.current.stepDay(); refresh(); }}>+ 하루</button>
-        <button type="button" onClick={reset}>같은 시드로 초기화</button>
+        <button type="button" onClick={reset}>현재 설정으로 초기화</button>
       </section>
     </main>
   );
 }
 
-function createEngine(): SimulationEngine {
-  return new SimulationEngine({ seed: DEFAULT_SEED }, mountainWinterScenario);
+function createEngine(settings: SetupSettings, paused = false): SimulationEngine {
+  const engine = new SimulationEngine(
+    {
+      seed: settings.seed || DEFAULT_SEED,
+      initialPopulation: settings.npcCount,
+    },
+    createScenario(settings),
+  );
+  engine.setPaused(paused);
+  return engine;
+}
+
+function createScenario(settings: SetupSettings): ScenarioDefinition {
+  return {
+    ...mountainWinterScenario,
+    durationDays: settings.winterEndDay,
+    preparationDays: settings.winterStartDay,
+    initialPopulation: settings.npcCount,
+  };
+}
+
+function sanitizeSetup(settings: SetupSettings): SetupSettings {
+  const npcCount = clampInteger(settings.npcCount, 1, 100);
+  const winterStartDay = clampInteger(settings.winterStartDay, 1, 180);
+  const winterEndDay = Math.max(
+    winterStartDay + 1,
+    clampInteger(settings.winterEndDay, 2, 240),
+  );
+  return {
+    seed: settings.seed.trim() || DEFAULT_SEED,
+    npcCount,
+    winterStartDay,
+    winterEndDay,
+  };
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function WinterNeeds({ snapshot }: { snapshot: SimulationSnapshot }) {
@@ -216,6 +348,8 @@ function CitizenPanel({ citizen }: { citizen: Citizen }) {
       <dl className="citizen-facts">
         <div><dt>행동</dt><dd>{GOAL_LABELS[citizen.goal]}</dd></div>
         <div><dt>임시 역할</dt><dd>{citizen.temporaryRole ?? "없음"}</dd></div>
+        <div><dt>전문 분야</dt><dd>{skillLabel(citizen.specialty)}</dd></div>
+        <div><dt>현재 생각</dt><dd>{citizen.thought?.label ?? "안정"}</dd></div>
         <div><dt>체온</dt><dd>{citizen.winter.bodyTemperature.toFixed(1)}°C</dd></div>
         <div><dt>추위 노출</dt><dd>{format(citizen.winter.coldExposure)}</dd></div>
         <div><dt>질병</dt><dd>{format(citizen.winter.illness)}</dd></div>
@@ -238,6 +372,20 @@ function CitizenPanel({ citizen }: { citizen: Citizen }) {
       </div>
     </section>
   );
+}
+
+function skillLabel(skill: Citizen["specialty"]): string {
+  return {
+    farming: "농사",
+    logging: "벌목",
+    construction: "건축",
+    hunting: "수렵",
+    medicine: "의료",
+    cooking: "조리",
+    scouting: "정찰",
+    negotiation: "협상",
+    leadership: "리더십",
+  }[skill];
 }
 
 function EventTimeline({ snapshot }: { snapshot: SimulationSnapshot }) {

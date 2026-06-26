@@ -24,11 +24,17 @@ const COLORS = {
   blacksmithRoof: 0x3e424a,
   market: 0xe4c06a,
   marketStripe: 0xcf5b4b,
+  fence: 0x6b5638,
+  gate: 0xf4e1aa,
 };
+
+const WINTER_BACKGROUND_KEY = "winter-village-background";
+const WINTER_BACKGROUND_URL = "/assets/winter-village-background.png";
 
 export class VillageScene extends Phaser.Scene {
   static readonly KEY = "village";
 
+  private background?: Phaser.GameObjects.Image;
   private terrain?: Phaser.GameObjects.Graphics;
   private buildings?: Phaser.GameObjects.Graphics;
   private pathGraphics?: Phaser.GameObjects.Graphics;
@@ -37,15 +43,26 @@ export class VillageScene extends Phaser.Scene {
   private selectedCitizenId?: string;
   private onCitizenSelect?: (citizenId: string) => void;
   private readonly citizenSprites = new Map<string, CitizenSprite>();
+  private readonly seenVisualEvents = new Set<string>();
 
   constructor() {
     super(VillageScene.KEY);
   }
 
+  preload(): void {
+    this.load.image(WINTER_BACKGROUND_KEY, WINTER_BACKGROUND_URL);
+  }
+
   create(): void {
-    this.cameras.main.setBackgroundColor(COLORS.ground);
-    this.terrain = this.add.graphics();
-    this.buildings = this.add.graphics();
+    this.cameras.main.setBackgroundColor(0xdfeaf2);
+    this.cameras.main.roundPixels = true;
+    this.background = this.add
+      .image(0, 0, WINTER_BACKGROUND_KEY)
+      .setOrigin(0, 0)
+      .setDepth(-20);
+    this.resizeBackground();
+    this.terrain = this.add.graphics().setDepth(-10);
+    this.buildings = this.add.graphics().setDepth(2);
     this.pathGraphics = this.add.graphics().setDepth(8);
     this.labels = this.add.container().setDepth(5);
     this.drawTerrain();
@@ -73,6 +90,7 @@ export class VillageScene extends Phaser.Scene {
 
   setSnapshot(snapshot: SimulationSnapshot): void {
     this.snapshot = snapshot;
+    this.resizeBackground();
     if (this.buildings) {
       this.syncSnapshot();
     }
@@ -104,7 +122,18 @@ export class VillageScene extends Phaser.Scene {
         this.citizenSprites.delete(id);
       }
     }
+    this.playVisualEvents(this.snapshot.visualEvents);
     this.updateSelection();
+  }
+
+  private resizeBackground(): void {
+    if (!this.background) {
+      return;
+    }
+    this.background.setDisplaySize(
+      this.snapshot?.mapWidth ?? 1024,
+      this.snapshot?.mapHeight ?? 680,
+    );
   }
 
   private updateSelection(): void {
@@ -125,6 +154,20 @@ export class VillageScene extends Phaser.Scene {
     const coldRatio = winter
       ? Phaser.Math.Clamp((5 - winter.currentTemperature) / 30, 0, 1)
       : 0;
+    if (this.background && this.textures.exists(WINTER_BACKGROUND_KEY)) {
+      this.terrain.fillStyle(0xeaf6ff, 0.08 + coldRatio * 0.16);
+      this.terrain.fillRect(0, 0, width, height);
+      if (winter && winter.snowDepth > 0.5) {
+        this.terrain.fillStyle(0xffffff, 0.72);
+        const snowflakes = Math.min(90, Math.round(winter.snowDepth * 5));
+        for (let index = 0; index < snowflakes; index += 1) {
+          const x = (index * 97 + snapshotHash(this.snapshot!.seed)) % width;
+          const y = (index * 53 + snapshotHash(this.snapshot!.seed) * 3) % height;
+          this.terrain.fillCircle(x, y, 1 + (index % 2));
+        }
+      }
+      return;
+    }
     const groundColor = Phaser.Display.Color.Interpolate.ColorWithColor(
       Phaser.Display.Color.ValueToColor(COLORS.ground),
       Phaser.Display.Color.ValueToColor(0xdce8ed),
@@ -133,6 +176,7 @@ export class VillageScene extends Phaser.Scene {
     ).color;
     this.terrain.fillStyle(groundColor, 1);
     this.terrain.fillRect(0, 0, width, height);
+    this.drawLayoutGround();
     this.terrain.fillStyle(0x7aae6c, 0.7);
     const count = Math.floor((width * height) / 14000);
     for (let index = 0; index < count; index += 1) {
@@ -157,8 +201,108 @@ export class VillageScene extends Phaser.Scene {
     }
     this.buildings.clear();
     this.labels.removeAll(true);
+    this.drawLayoutLabels();
     for (const building of items) {
       this.drawBuilding(building);
+    }
+  }
+
+  private drawLayoutGround(): void {
+    if (!this.terrain || !this.snapshot?.layout) {
+      return;
+    }
+    const center = { x: this.snapshot.mapWidth / 2, y: this.snapshot.mapHeight / 2 };
+    for (const zone of this.snapshot.layout.zones) {
+      const color = zoneColor(zone.type);
+      this.terrain.fillStyle(color, 0.12);
+      this.terrain.fillRoundedRect(
+        zone.rect.x,
+        zone.rect.y,
+        zone.rect.width,
+        zone.rect.height,
+        12,
+      );
+      this.drawRoad(zone.gate, center, 0.32);
+      this.drawFence(zone);
+      this.terrain.fillStyle(COLORS.gate, 0.95);
+      this.terrain.fillRoundedRect(zone.gate.x - 14, zone.gate.y - 8, 28, 16, 5);
+      this.terrain.lineStyle(1, COLORS.fence, 0.55);
+      this.terrain.strokeRoundedRect(zone.gate.x - 14, zone.gate.y - 8, 28, 16, 5);
+    }
+  }
+
+  private drawRoad(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    alpha: number,
+  ): void {
+    if (!this.terrain) {
+      return;
+    }
+    this.terrain.lineStyle(10, COLORS.road, alpha);
+    this.terrain.beginPath();
+    this.terrain.moveTo(from.x, from.y);
+    this.terrain.lineTo(to.x, from.y);
+    this.terrain.lineTo(to.x, to.y);
+    this.terrain.strokePath();
+  }
+
+  private drawFence(zone: SimulationSnapshot["layout"]["zones"][number]): void {
+    if (!this.terrain) {
+      return;
+    }
+    const step = 10;
+    const left = zone.rect.x;
+    const right = zone.rect.x + zone.rect.width;
+    const top = zone.rect.y;
+    const bottom = zone.rect.y + zone.rect.height;
+    this.terrain.fillStyle(COLORS.fence, 0.88);
+
+    for (let x = left; x <= right; x += step) {
+      if (!nearGate({ x, y: top }, zone.gate) && !nearGate({ x, y: bottom }, zone.gate)) {
+        this.terrain.fillRect(x - 1, top - 4, 2, 8);
+        this.terrain.fillRect(x - 1, bottom - 4, 2, 8);
+      }
+    }
+    for (let y = top; y <= bottom; y += step) {
+      if (!nearGate({ x: left, y }, zone.gate) && !nearGate({ x: right, y }, zone.gate)) {
+        this.terrain.fillRect(left - 4, y - 1, 8, 2);
+        this.terrain.fillRect(right - 4, y - 1, 8, 2);
+      }
+    }
+  }
+
+  private drawLayoutLabels(): void {
+    if (!this.labels || !this.snapshot?.layout) {
+      return;
+    }
+    for (const zone of this.snapshot.layout.zones) {
+      this.labels.add(
+        this.add
+          .text(zone.rect.x + 12, zone.rect.y + 10, zone.label, {
+            fontFamily: "Malgun Gothic, system-ui, sans-serif",
+            fontSize: "14px",
+            color: "#143122",
+            backgroundColor: "rgba(255,255,255,0.86)",
+            padding: { x: 7, y: 3 },
+            resolution: 2,
+          })
+          .setOrigin(0, 0)
+          .setShadow(0, 1, "#ffffff", 2, true, true),
+      );
+      this.labels.add(
+        this.add
+          .text(zone.gate.x, zone.gate.y + 10, "출입구", {
+            fontFamily: "Malgun Gothic, system-ui, sans-serif",
+            fontSize: "12px",
+            color: "#3b3425",
+            backgroundColor: "rgba(255,255,255,0.76)",
+            padding: { x: 5, y: 2 },
+            resolution: 2,
+          })
+          .setOrigin(0.5, 0)
+          .setShadow(0, 1, "#ffffff", 2, true, true),
+      );
     }
   }
 
@@ -353,14 +497,105 @@ export class VillageScene extends Phaser.Scene {
     this.labels.add(
       this.add
         .text(building.position.x, building.position.y + 38, label, {
-          fontFamily: "system-ui, sans-serif",
-          fontSize: "10px",
-          color: "#173124",
-          backgroundColor: "rgba(255,255,255,0.72)",
-          padding: { x: 4, y: 2 },
+          fontFamily: "Malgun Gothic, system-ui, sans-serif",
+          fontSize: "13px",
+          fontStyle: "bold",
+          color: "#10281d",
+          backgroundColor: "rgba(255,255,255,0.9)",
+          padding: { x: 6, y: 3 },
+          resolution: 2,
         })
-        .setOrigin(0.5, 0),
+        .setOrigin(0.5, 0)
+        .setShadow(0, 1, "#ffffff", 2, true, true),
     );
+  }
+
+  private playVisualEvents(
+    events: SimulationSnapshot["visualEvents"],
+  ): void {
+    for (const event of events) {
+      if (this.seenVisualEvents.has(event.id)) {
+        continue;
+      }
+      this.seenVisualEvents.add(event.id);
+      this.spawnResourcePopup(event);
+    }
+    while (this.seenVisualEvents.size > 160) {
+      const oldest = this.seenVisualEvents.values().next().value as
+        | string
+        | undefined;
+      if (!oldest) {
+        break;
+      }
+      this.seenVisualEvents.delete(oldest);
+    }
+  }
+
+  private spawnResourcePopup(
+    event: SimulationSnapshot["visualEvents"][number],
+  ): void {
+    const container = this.add
+      .container(event.position.x, event.position.y - 38)
+      .setDepth(35)
+      .setAlpha(0)
+      .setScale(0.86);
+    const text = this.add
+      .text(0, 0, `${event.icon} ${event.label}`, {
+        fontFamily: "Segoe UI Emoji, Malgun Gothic, system-ui, sans-serif",
+        fontSize: "16px",
+        fontStyle: "bold",
+        color: "#10281d",
+        resolution: 2,
+      })
+      .setOrigin(0.5);
+    text.setShadow(0, 1, "#ffffff", 3, true, true);
+    const width = Math.max(42, text.width + 18);
+    const bubble = this.add.graphics();
+    bubble.fillStyle(0xffffff, 0.94);
+    bubble.fillRoundedRect(-width / 2, -14, width, 28, 12);
+    bubble.lineStyle(2, 0xbdd2e8, 0.95);
+    bubble.strokeRoundedRect(-width / 2, -14, width, 28, 12);
+    container.add([bubble, text]);
+
+    for (let index = 0; index < 3; index += 1) {
+      const spark = this.add.circle(
+        Phaser.Math.Between(-18, 18),
+        Phaser.Math.Between(-10, 10),
+        2,
+        0xfff1a8,
+        0.95,
+      );
+      container.add(spark);
+      this.tweens.add({
+        targets: spark,
+        x: spark.x + Phaser.Math.Between(-12, 12),
+        y: spark.y - Phaser.Math.Between(12, 24),
+        alpha: 0,
+        scale: 0.35,
+        duration: 620,
+        ease: "Sine.easeOut",
+      });
+    }
+
+    this.tweens.add({
+      targets: container,
+      y: container.y - 42,
+      alpha: { from: 0, to: 1 },
+      scale: { from: 0.86, to: 1 },
+      duration: 180,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        this.tweens.add({
+          targets: container,
+          y: container.y - 16,
+          alpha: 0,
+          duration: 760,
+          delay: 220,
+          ease: "Sine.easeIn",
+          onComplete: () => container.destroy(true),
+        });
+      },
+    });
   }
 
   private drawSelectedPath(): void {
@@ -408,4 +643,20 @@ function snapshotHash(seed: string): number {
     hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   }
   return hash;
+}
+
+function zoneColor(type: SimulationSnapshot["layout"]["zones"][number]["type"]): number {
+  return {
+    farm: 0x7fb45d,
+    residential: 0xe4b36a,
+    work: 0x9a7a5a,
+    storage: 0x7f9fb7,
+  }[type];
+}
+
+function nearGate(
+  point: { x: number; y: number },
+  gate: { x: number; y: number },
+): boolean {
+  return Math.abs(point.x - gate.x) <= 18 && Math.abs(point.y - gate.y) <= 18;
 }

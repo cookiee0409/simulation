@@ -252,6 +252,7 @@ function createCitizen(overrides: Partial<Citizen> = {}): Citizen {
       negotiation: 50,
       leadership: 50,
     },
+    specialty: "farming",
     winter: {
       bodyTemperature: 36.7,
       coldExposure: 0,
@@ -269,6 +270,7 @@ function createCitizen(overrides: Partial<Citizen> = {}): Citizen {
     actionState: "deciding",
     path: [],
     pathIndex: 0,
+    movementBudget: 0,
     actionProgress: 0,
     decisionCooldown: 0,
     decisionScore: 0,
@@ -328,5 +330,8 @@ function createState(
     opportunities: [],
     stage: "camp",
     winterNeeds: [],
+    layout: { zones: [] },
+    visualEvents: [],
+    nextVisualEventSerial: 1,
   };
 }

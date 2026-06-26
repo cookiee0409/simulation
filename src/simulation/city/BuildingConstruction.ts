@@ -1,4 +1,8 @@
-import { createBuilding, getBuildingHalfSize } from "./BuildingFactory";
+import {
+  createBuilding,
+  getBuildingHalfSize,
+  getBuildingPosition,
+} from "./BuildingFactory";
 import { findBuildingPlacement } from "./BuildingPlacementSystem";
 import { BUILDING_DEFINITIONS } from "./buildingDefinitions";
 import type { SimulationConfig } from "../core/SimulationConfig";
@@ -29,7 +33,10 @@ export function requestBuilding(
     }
   }
 
-  const position = findBuildingPlacement(state, config, type);
+  const index = state.buildings.filter((b) => b.type === type).length;
+  const position =
+    findBuildingPlacement(state, config, type) ??
+    getBuildingPosition(type, index);
   if (!position) {
     return false;
   }
@@ -38,7 +45,6 @@ export function requestBuilding(
     state.resources[resource as ResourceType] -= amount ?? 0;
   }
 
-  const index = state.buildings.filter((b) => b.type === type).length;
   const building = createBuilding(
     type,
     index,

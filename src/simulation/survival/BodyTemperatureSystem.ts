@@ -1,5 +1,6 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SimulationState } from "../types";
+import { getBuildingHalfSize } from "../city/BuildingFactory";
 import { WINTER_BALANCE } from "../scenarios/mountainWinter/winterBalance";
 
 export function updateBodyTemperatures(
@@ -14,8 +15,11 @@ export function updateBodyTemperatures(
     const shelter = findShelter(citizen, state);
     const isIndoor =
       shelter !== undefined &&
+      isAtShelter(citizen, shelter, config) &&
       (citizen.goal === "rest" ||
+        citizen.goal === "return_home" ||
         citizen.goal === "heat_home" ||
+        citizen.actionState === "performing" ||
         citizen.actionState === "waiting");
     const ambient = isIndoor
       ? shelter.winter.indoorTemperature
@@ -87,6 +91,21 @@ function findShelter(
     }
   }
   return state.buildings.find((building) => building.id === citizen.homeId);
+}
+
+function isAtShelter(
+  citizen: SimulationState["citizens"][number],
+  shelter: SimulationState["buildings"][number],
+  config: SimulationConfig,
+): boolean {
+  const half = getBuildingHalfSize(shelter.type, config.gridSize);
+  const insideBuilding =
+    Math.abs(citizen.position.x - shelter.position.x) <= half.x + config.gridSize &&
+    Math.abs(citizen.position.y - shelter.position.y) <= half.y + config.gridSize;
+  const nearEntrance =
+    Math.abs(citizen.position.x - shelter.entrance.x) <= config.gridSize &&
+    Math.abs(citizen.position.y - shelter.entrance.y) <= config.gridSize;
+  return insideBuilding || nearEntrance;
 }
 
 function ageVulnerability(age: number): number {

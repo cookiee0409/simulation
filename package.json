@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "build": "tsc --noEmit && vite build --configLoader runner",
+    "test": "vitest run --configLoader runner",
+    "test:watch": "vitest --configLoader runner",
     "simulate:100": "tsx scripts/run-headless.ts",
     "simulate:winter": "tsx scripts/run-winter-scenario.ts",
     "simulate:winter:multi": "tsx scripts/run-winter-multi-seed.ts"

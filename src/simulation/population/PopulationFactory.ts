@@ -15,6 +15,7 @@ export function createCitizens(
   for (let index = 0; index < config.initialPopulation; index += 1) {
     const home = completedHouses[Math.floor(index / config.houseCapacity)];
     const position = createStartingPosition(index, home, config);
+    const skills = createSkills(random);
     citizens.push({
       id: `citizen-${String(index + 1).padStart(3, "0")}`,
       age: random.integer(config.founderAgeMin, config.founderAgeMax),
@@ -39,13 +40,15 @@ export function createCitizens(
         attachmentToVillage: random.integer(0, 100),
         ruleFollowing: random.integer(0, 100),
       },
-      skills: createSkills(random),
+      skills,
+      specialty: dominantSkill(skills),
       winter: createWinterState(random),
       fatigue: random.between(0, 12),
       goal: "wander",
       actionState: "deciding",
       path: [],
       pathIndex: 0,
+      movementBudget: 0,
       actionProgress: 0,
       decisionCooldown: 0,
       decisionScore: 0,
@@ -68,6 +71,7 @@ export function createChild(
   home: Building | undefined,
 ): Citizen {
   const base = home?.entrance ?? { x: config.mapWidth / 2, y: config.mapHeight / 2 };
+  const skills = createSkills(random);
   return {
     id: `citizen-${String(serial).padStart(3, "0")}`,
     age: 0,
@@ -95,13 +99,15 @@ export function createChild(
       attachmentToVillage: random.integer(0, 100),
       ruleFollowing: random.integer(0, 100),
     },
-    skills: createSkills(random),
+    skills,
+    specialty: dominantSkill(skills),
     winter: createWinterState(random),
     fatigue: 0,
     goal: "wander",
     actionState: "deciding",
     path: [],
     pathIndex: 0,
+    movementBudget: 0,
     actionProgress: 0,
     decisionCooldown: 0,
     decisionScore: 0,
@@ -112,7 +118,19 @@ export function createChild(
 }
 
 function createSkills(random: SeededRandom): Citizen["skills"] {
-  return {
+  const specialties: Array<keyof Citizen["skills"]> = [
+    "farming",
+    "logging",
+    "construction",
+    "hunting",
+    "medicine",
+    "cooking",
+    "scouting",
+    "negotiation",
+    "leadership",
+  ];
+  const specialty = random.pick(specialties);
+  const skills = {
     farming: random.integer(10, 65),
     logging: random.integer(10, 65),
     construction: random.integer(10, 65),
@@ -123,6 +141,14 @@ function createSkills(random: SeededRandom): Citizen["skills"] {
     negotiation: random.integer(5, 65),
     leadership: random.integer(5, 65),
   };
+  skills[specialty] = random.integer(72, 95);
+  return skills;
+}
+
+function dominantSkill(skills: Citizen["skills"]): Citizen["specialty"] {
+  return (Object.keys(skills) as Array<keyof Citizen["skills"]>).sort(
+    (left, right) => skills[right] - skills[left] || left.localeCompare(right),
+  )[0]!;
 }
 
 function createWinterState(random: SeededRandom): Citizen["winter"] {
@@ -147,8 +173,8 @@ function createStartingPosition(
 ): GridPosition {
   const grid = config.gridSize;
   const base = home?.entrance ?? {
-    x: 360,
-    y: 260,
+    x: config.mapWidth / 2,
+    y: config.mapHeight / 2,
   };
   const offsets = [
     { x: 0, y: 0 },

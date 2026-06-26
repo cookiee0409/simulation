@@ -28,8 +28,10 @@ export function processFoodDay(
 
   const survivors: Citizen[] = [];
   let populationLost = 0;
+  const villageHasFoodBuffer =
+    state.resources.food >= state.citizens.length * config.foodPerCitizenPerDay * 2;
   for (const citizen of state.citizens) {
-    if (shouldLeaveFromHunger(citizen, config, random)) {
+    if (shouldLeaveFromHunger(citizen, config, random, villageHasFoodBuffer)) {
       citizen.action = "leaving";
       populationLost += 1;
       if (state.scenario) {
@@ -103,9 +105,13 @@ function shouldLeaveFromHunger(
   citizen: Citizen,
   config: SimulationConfig,
   random: SeededRandom,
+  villageHasFoodBuffer: boolean,
 ): boolean {
   if (citizen.health <= 0) {
     return true;
+  }
+  if (villageHasFoodBuffer) {
+    return false;
   }
   if (citizen.hunger < config.severeHungerThreshold) {
     return false;

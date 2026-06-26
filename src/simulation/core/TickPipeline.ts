@@ -3,6 +3,7 @@ import { AgentExecutionSystem } from "../agents/AgentExecutionSystem";
 import { AgentMovementSystem } from "../agents/AgentMovementSystem";
 import { AgentNeedsSystem } from "../agents/AgentNeedsSystem";
 import { AgentPerceptionSystem } from "../agents/AgentPerceptionSystem";
+import { updateCitizenThoughts } from "../agents/CitizenThoughtSystem";
 import { synchronizeVillageFood } from "../economy/FoodSystem";
 import { getBuildingHalfSize } from "../city/BuildingFactory";
 import type { GridPathfinder } from "../pathfinding/GridPathfinder";
@@ -63,6 +64,7 @@ export class TickPipeline {
       this.execution.updateCitizen(citizen, state, config, day, random);
     }
     updateBodyTemperatures(state, config);
+    updateCitizenThoughts(state);
     synchronizeVillageFood(state);
   }
 }

@@ -1,6 +1,10 @@
-import { getBuildingHalfSize } from "./BuildingFactory";
+import { getBuildingHalfSize, getBuildingPosition } from "./BuildingFactory";
 import { BUILDING_DEFINITIONS } from "./buildingDefinitions";
 import type { SimulationConfig } from "../core/SimulationConfig";
+import {
+  createFenceBlockedCells,
+  zoneTypeForBuilding,
+} from "../map/VillageLayout";
 import type { Building, BuildingType, GridPosition, SimulationState } from "../types";
 
 /**
@@ -32,13 +36,34 @@ export function findBuildingPlacement(
     config,
   );
   const anchor = anchorPoint(state, config, type);
+  const placementZone = state.layout.zones.find(
+    (zone) => zone.type === zoneTypeForBuilding(type),
+  );
 
   // 적합한 후보를 모아 앵커 거리순으로 정렬한 뒤, 연결성을 깨지 않는 첫 후보를 고른다.
   const candidates: Array<{ position: GridPosition; score: number }> = [];
+  const preset = getBuildingPosition(
+    type,
+    state.buildings.filter((building) => building.type === type).length,
+  );
+  if (
+    preset &&
+    (!placementZone || insideZone(preset, half, grid, placementZone)) &&
+    !overlapsExistingBuilding(preset, half, state, config) &&
+    !(
+      def.minDistanceFromHouses > 0 &&
+      tooCloseToHouses(preset, half, grid, houseCells, def.minDistanceFromHouses)
+    )
+  ) {
+    return preset;
+  }
   const margin = grid * 2;
   for (let y = margin; y <= config.mapHeight - margin; y += grid) {
     for (let x = margin; x <= config.mapWidth - margin; x += grid) {
       const position = { x, y };
+      if (placementZone && !insideZone(position, half, grid, placementZone)) {
+        continue;
+      }
       if (!fits(position, half, grid, config, occupiedForFit)) continue;
       if (
         def.minDistanceFromHouses > 0 &&
@@ -113,6 +138,9 @@ function blockedWithCandidate(
   config: SimulationConfig,
 ): Set<string> {
   const blocked = occupiedCells(state, config);
+  for (const fenceCell of createFenceBlockedCells(state.layout, config)) {
+    blocked.add(keyOf(fenceCell));
+  }
   for (let y = position.y - half.y; y <= position.y + half.y; y += grid) {
     for (let x = position.x - half.x; x <= position.x + half.x; x += grid) {
       blocked.add(cellKey(x, y, grid));
@@ -123,7 +151,43 @@ function blockedWithCandidate(
   for (const building of state.buildings) {
     blocked.delete(keyOf(cell(building.entrance, grid)));
   }
+  for (const zone of state.layout.zones) {
+    blocked.delete(keyOf(cell(zone.gate, grid)));
+  }
   return blocked;
+}
+
+function insideZone(
+  position: GridPosition,
+  half: GridPosition,
+  grid: number,
+  zone: SimulationState["layout"]["zones"][number],
+): boolean {
+  const entrance = { x: position.x, y: position.y + half.y + grid };
+  return (
+    position.x - half.x >= zone.rect.x + grid &&
+    position.x + half.x <= zone.rect.x + zone.rect.width - grid &&
+    position.y - half.y >= zone.rect.y + grid &&
+    entrance.y <= zone.rect.y + zone.rect.height - grid
+  );
+}
+
+function overlapsExistingBuilding(
+  position: GridPosition,
+  half: GridPosition,
+  state: SimulationState,
+  config: SimulationConfig,
+): boolean {
+  for (const building of state.buildings) {
+    const otherHalf = getBuildingHalfSize(building.type, config.gridSize);
+    const overlaps =
+      Math.abs(position.x - building.position.x) <= half.x + otherHalf.x &&
+      Math.abs(position.y - building.position.y) <= half.y + otherHalf.y;
+    if (overlaps) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function cell(p: GridPosition, grid: number): { x: number; y: number } {

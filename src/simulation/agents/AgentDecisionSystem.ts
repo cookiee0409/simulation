@@ -50,8 +50,18 @@ export class AgentDecisionSystem {
     const emergency =
       citizen.hunger >= config.emergencyHungerThreshold &&
       citizen.goal !== "eat";
+    const coldEmergency =
+      state.scenario !== undefined &&
+      (citizen.winter.bodyTemperature < 35.8 ||
+        citizen.winter.coldExposure >= 45 ||
+        (citizen.age < config.childMaturityYears &&
+          state.scenario.phase === "winter")) &&
+      citizen.goal !== "rest" &&
+      citizen.goal !== "return_home" &&
+      citizen.goal !== "eat";
     const shouldDecide =
       emergency ||
+      coldEmergency ||
       citizen.actionState === "completed" ||
       citizen.actionState === "failed" ||
       citizen.actionState === "deciding" ||
@@ -93,6 +103,7 @@ export class AgentDecisionSystem {
     }
     citizen.path = [];
     citizen.pathIndex = 0;
+    citizen.movementBudget = 0;
     citizen.actionProgress = 0;
     citizen.decisionScore = round(decision.score);
     citizen.decisionReasons = decision.reasons.map((reason) => ({ ...reason }));
@@ -133,10 +144,17 @@ export function chooseGoal(
     }
   }
 
-  if (citizen.canWork && citizen.job === "farmer") {
+  if (
+    citizen.canWork &&
+    (citizen.job === "farmer" ||
+      (perception.scenario &&
+        (citizen.skills.farming >= 55 || winterUrgency("winter_food") >= 62)))
+  ) {
     for (const task of tasksByType("farm_work")) {
       const reasons = [
-        reason("농부 직업", 48),
+        reason("농부 직업", citizen.job === "farmer" ? 48 : 12),
+        reason("농사 기술", citizen.skills.farming * 0.28),
+        reason("전문 분야", specialtyBonus(citizen, "farming", 18)),
         reason("마을 식량 부족", perception.foodShortage * 0.7),
         reason("겨울 식량 비축", winterUrgency("winter_food") * 0.86),
         reason("농장 작업 수요", task.priority * 0.42),
@@ -152,6 +170,8 @@ export function chooseGoal(
     for (const task of tasksByType("gather_wood")) {
       const reasons = [
         reason("벌목공 직업", 46),
+        reason("벌목 기술", citizen.skills.logging * 0.22),
+        reason("전문 분야", specialtyBonus(citizen, "logging", 16)),
         reason("겨울 땔감 비축", winterUrgency("firewood") * 0.74),
         reason("채집 작업 수요", task.priority * 0.42),
         reason("배고픔", -citizen.hunger * 0.72),
@@ -170,6 +190,7 @@ export function chooseGoal(
       const reasons = [
         reason("땔감 비축 필요", winterUrgency("firewood") * 0.82),
         reason("벌목 기술", citizen.skills.logging * 0.42),
+        reason("전문 분야", specialtyBonus(citizen, "logging", 18)),
         reason("마을 협력 성향", citizen.traits.cooperation * 0.18),
         reason("추위 노출 위험", -perception.scenario.outdoorRisk * 42),
         reason("피로", -citizen.fatigue * 0.32),
@@ -180,6 +201,7 @@ export function chooseGoal(
       const reasons = [
         reason("땔감 부족", winterUrgency("firewood") * 0.55),
         reason("벌목 기술", citizen.skills.logging * 0.28),
+        reason("전문 분야", specialtyBonus(citizen, "logging", 12)),
         reason("실내 작업 안전성", perception.scenario.outdoorRisk * 24),
         reason("농사 전문성 유지", citizen.job === "farmer" ? -42 : 0),
         reason("피로", -citizen.fatigue * 0.25),
@@ -190,6 +212,7 @@ export function chooseGoal(
       const reasons = [
         reason("주민 보온 필요", winterUrgency("warmth") * 0.62),
         reason("공감 성향", citizen.traits.empathy * 0.25),
+        reason("요리/살림 기술", citizen.skills.cooking * 0.08),
         reason("규칙 준수", citizen.traits.ruleFollowing * 0.12),
         reason("피로", -citizen.fatigue * 0.18),
       ];
@@ -199,6 +222,7 @@ export function chooseGoal(
       const reasons = [
         reason("주택 손상", winterUrgency("shelter_repair") * 0.9),
         reason("건축 기술", citizen.skills.construction * 0.5),
+        reason("전문 분야", specialtyBonus(citizen, "construction", 18)),
         reason("마을 애착", citizen.traits.attachmentToVillage * 0.14),
         reason("배고픔", -citizen.hunger * 0.25),
       ];
@@ -208,6 +232,7 @@ export function chooseGoal(
       const reasons = [
         reason("단열 필요", winterUrgency("insulation") * 0.88),
         reason("건축 기술", citizen.skills.construction * 0.46),
+        reason("전문 분야", specialtyBonus(citizen, "construction", 16)),
         reason("인내심", citizen.traits.patience * 0.12),
         reason("배고픔", -citizen.hunger * 0.25),
       ];
@@ -218,14 +243,15 @@ export function chooseGoal(
         continue;
       }
       if (
-        citizen.skills.medicine < 35 &&
-        citizen.traits.empathy < 70
+        citizen.skills.medicine < 22 &&
+        citizen.traits.empathy < 58
       ) {
         continue;
       }
       const reasons = [
         reason("환자 돌봄 필요", winterUrgency("medicine") * 0.45),
         reason("의료 기술", citizen.skills.medicine * 0.55),
+        reason("전문 분야", specialtyBonus(citizen, "medicine", 18)),
         reason("공감 성향", citizen.traits.empathy * 0.2),
         reason("이기성", -citizen.traits.selfishness * 0.18),
       ];
@@ -261,6 +287,7 @@ export function chooseGoal(
     for (const task of tasksByType("gather_stone")) {
       const reasons = [
         reason("채석공 직업", 46),
+        reason("전문 분야", specialtyBonus(citizen, "construction", 8)),
         reason("채집 작업 수요", task.priority * 0.42),
         reason("배고픔", -citizen.hunger * 0.72),
         reason("피로", -citizen.fatigue * 0.32),
@@ -280,6 +307,7 @@ export function chooseGoal(
         reason("운반 작업 우선도", task.priority * 0.6),
         reason("마을 식량 부족", perception.foodShortage * 0.35),
         reason("협력 성향", citizen.traits.cooperation * 0.12),
+        reason("체계적 운반", specialtyBonus(citizen, "cooking", 6)),
         reason("배고픔", -citizen.hunger * 0.62),
         reason("거리", -distance(citizen.position, task.targetPosition) * 0.07),
       ];
@@ -293,6 +321,8 @@ export function chooseGoal(
           "협력 성향",
           citizen.traits.cooperation * (citizen.job === "carpenter" ? 0.3 : 0.15),
         ),
+        reason("건축 기술", citizen.skills.construction * 0.22),
+        reason("전문 분야", specialtyBonus(citizen, "construction", 12)),
         reason("배고픔", -citizen.hunger * 0.7),
         reason("거리", -distance(citizen.position, task.targetPosition) * 0.07),
       ];
@@ -307,12 +337,27 @@ export function chooseGoal(
   );
   if (
     homeTask &&
-    (citizen.fatigue >= 60 || perception.tickInDay >= 112)
+    (citizen.fatigue >= 60 ||
+      perception.tickInDay >= 112 ||
+      (perception.scenario &&
+        (citizen.winter.bodyTemperature < 36.1 ||
+          citizen.winter.coldExposure >= 35 ||
+          citizen.winter.illness >= 18 ||
+          citizen.age < config.childMaturityYears)))
   ) {
     const nightBonus = perception.tickInDay >= 112 ? 42 : 0;
+    const coldBonus = perception.scenario
+      ? Math.max(0, 36.4 - citizen.winter.bodyTemperature) * 45 +
+        citizen.winter.coldExposure * 0.75
+      : 0;
+    const vulnerableBonus =
+      citizen.age < config.childMaturityYears || citizen.age >= 65 ? 34 : 0;
     const reasons = [
       reason("피로", citizen.fatigue * 1.6),
       reason("야간", nightBonus),
+      reason("추위 회피", coldBonus),
+      reason("취약 주민 보호", vulnerableBonus),
+      reason("질병 회복", citizen.winter.illness * 0.5),
       reason("긴급 식량 작업", -perception.foodShortage * 0.22),
       reason("거리", -distance(citizen.position, homeTask.targetPosition) * 0.05),
     ];
@@ -326,6 +371,7 @@ export function chooseGoal(
         38 + perception.foodShortage * 0.5 - citizen.fatigue * 0.2,
       reasons: [
         reason("정착민 생존 채집", 38),
+        reason("수렵/정찰 기술", Math.max(citizen.skills.hunting, citizen.skills.scouting) * 0.12),
         reason("마을 식량 부족", perception.foodShortage * 0.5),
         reason("피로", -citizen.fatigue * 0.2),
       ],
@@ -362,8 +408,21 @@ function addWorkshopCandidate(
     return;
   }
   for (const task of tasksByType(taskType)) {
+    const relatedSkill =
+      goal === "work_carpentry"
+        ? "construction"
+        : goal === "work_blacksmith"
+          ? "construction"
+          : "negotiation";
     const reasons = [
       reason(jobLabel, 46),
+      reason(
+        "관련 기술",
+        (relatedSkill === "construction"
+          ? citizen.skills.construction
+          : citizen.skills.negotiation) * 0.18,
+      ),
+      reason("전문 분야", specialtyBonus(citizen, relatedSkill, 12)),
       reason("작업장 수요", task.priority * 0.42),
       reason("배고픔", -citizen.hunger * 0.72),
       reason("피로", -citizen.fatigue * 0.3),
@@ -411,12 +470,24 @@ function reason(factor: string, score: number): CitizenDecisionReason {
   return { factor, score: round(score) };
 }
 
+function specialtyBonus(
+  citizen: Citizen,
+  skill: keyof Citizen["skills"],
+  bonus: number,
+): number {
+  return citizen.specialty === skill ? bonus : 0;
+}
+
 function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
 function temporaryRoleFor(goal: CitizenGoal): Citizen["temporaryRole"] {
   switch (goal) {
+    case "work_farm":
+    case "forage":
+    case "carry_food":
+      return "food_gatherer";
     case "gather_wood":
     case "process_firewood":
       return "wood_gatherer";

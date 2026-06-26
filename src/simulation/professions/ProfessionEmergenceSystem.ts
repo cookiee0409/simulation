@@ -120,11 +120,16 @@ function scoreProfession(
         c.age >= config.childMaturityYears,
     ).length;
     // 식량이 확보되고, 채집을 이어갈 여유 노동력이 남을 때만 전문 직업이 분화한다.
-    const foodSecure =
-      farmers > 0 &&
-      foodUrgency < 25 &&
-      state.resources.food > demand * 3 &&
-      spareSettlers >= config.minForagersReserve + 1;
+    const isBaseResourceJob = def.id === "lumberjack" || def.id === "miner";
+    const foodSecure = isBaseResourceJob
+      ? farmers > 0 &&
+        foodUrgency < 60 &&
+        state.resources.food > demand * 1.5 &&
+        spareSettlers >= config.minForagersReserve
+      : farmers >= Math.max(2, Math.ceil(state.citizens.length / 8)) &&
+        foodUrgency < 25 &&
+        state.resources.food > demand * 6 &&
+        spareSettlers >= config.minForagersReserve + 1;
     if (!foodSecure) add("여유 노동력/식량 부족", -80);
   }
 

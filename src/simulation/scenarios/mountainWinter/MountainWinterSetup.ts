@@ -23,6 +23,7 @@ export function scenarioConfigOverrides(
     founderAgeMax: definition.citizenGeneration.ageMax,
     housingGrowthBuffer: 0,
     birthChancePerDay: 0,
+    movementCellsPerTick: 2,
   };
 }
 
@@ -50,14 +51,21 @@ export function initializeMountainWinterState(
           ? "lumberjack"
           : index < 15
             ? "carpenter"
-            : "settler";
+          : "settler";
     boostJobSkills(citizen);
+    citizen.specialty = dominantSkill(citizen.skills);
     citizen.winter.clothingWarmth += index < clothingCount ? 25 : 0;
     citizen.canWork = citizen.age >= 15 && citizen.age < 68;
     citizen.groupId = citizen.homeId
       ? `household-${citizen.homeId}`
       : `household-${Math.floor(index / 4) + 1}`;
   }
+}
+
+function dominantSkill(skills: Citizen["skills"]): Citizen["specialty"] {
+  return (Object.keys(skills) as Array<keyof Citizen["skills"]>).sort(
+    (left, right) => skills[right] - skills[left] || left.localeCompare(right),
+  )[0]!;
 }
 
 function scenarioAge(

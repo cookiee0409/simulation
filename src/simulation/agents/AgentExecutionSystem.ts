@@ -104,11 +104,17 @@ export class AgentExecutionSystem {
         building.type === "farm" &&
         building.constructionProgress >= 100,
     );
-    if (!farm || citizen.job !== "farmer" || !citizen.canWork) {
+    const canFarm =
+      citizen.job === "farmer" ||
+      (state.scenario !== undefined &&
+        citizen.temporaryRole === "food_gatherer" &&
+        citizen.skills.farming >= 45);
+    if (!farm || !canFarm || !citizen.canWork) {
       fail(citizen);
       return;
     }
-    citizen.actionProgress += 1 / config.farmActionTicks;
+    const workSpeed = skillMultiplier(citizen, "farming", 0.7);
+    citizen.actionProgress += workSpeed / config.farmActionTicks;
     if (citizen.actionProgress < 1) {
       return;
     }
@@ -122,6 +128,7 @@ export class AgentExecutionSystem {
       productivity *
       toolProductivityMultiplier(state, config) *
       (state.scenario?.agricultureProductivity ?? 1) *
+      skillMultiplier(citizen, "farming", 0.45) *
       Math.max(
         0,
         1 +
@@ -130,8 +137,24 @@ export class AgentExecutionSystem {
             config.dailyProductionNoise,
           ) ?? 0),
       );
-    farm.inventory.food = (farm.inventory.food ?? 0) + amount;
+    const winterWarehouse = state.scenario
+      ? findNearestWarehouse(citizen, state)
+      : undefined;
+    if (winterWarehouse) {
+      winterWarehouse.inventory.food = Math.min(
+        winterWarehouse.capacity,
+        (winterWarehouse.inventory.food ?? 0) + amount,
+      );
+    } else {
+      farm.inventory.food = (farm.inventory.food ?? 0) + amount;
+    }
     state.dailyMetrics.foodProduced += amount;
+    pushVisualEvent(state, {
+      position: farm.position,
+      icon: "🌾",
+      label: `+${formatAmount(amount)}`,
+      resource: "food",
+    });
     complete(citizen);
   }
 
@@ -145,7 +168,8 @@ export class AgentExecutionSystem {
       fail(citizen);
       return;
     }
-    citizen.actionProgress += 1 / config.forageActionTicks;
+    citizen.actionProgress +=
+      skillMultiplier(citizen, "hunting", 0.35) / config.forageActionTicks;
     if (citizen.actionProgress < 1) {
       return;
     }
@@ -181,6 +205,12 @@ export class AgentExecutionSystem {
       );
       state.dailyMetrics.foodProduced += amount;
       state.dailyMetrics.foragedToday += amount;
+      pushVisualEvent(state, {
+        position: warehouse.position,
+        icon: "🧺",
+        label: `+${formatAmount(amount)}`,
+        resource: "food",
+      });
     }
     complete(citizen);
   }
@@ -209,7 +239,9 @@ export class AgentExecutionSystem {
       fail(citizen);
       return;
     }
-    citizen.actionProgress += 1 / config.gatherActionTicks;
+    const skillName = resource === "wood" ? "logging" : "construction";
+    citizen.actionProgress +=
+      skillMultiplier(citizen, skillName, 0.55) / config.gatherActionTicks;
     if (citizen.actionProgress < 1) {
       return;
     }
@@ -224,7 +256,8 @@ export class AgentExecutionSystem {
       productivity *
       (resource === "wood"
         ? 0.65 + citizen.skills.logging / 160
-        : 1) *
+        : 0.75 + citizen.skills.construction / 240) *
+      skillMultiplier(citizen, skillName, 0.25) *
       toolProductivityMultiplier(state, config) *
       Math.max(
         0,
@@ -240,6 +273,12 @@ export class AgentExecutionSystem {
       target,
       state.resources[resource] + amount,
     );
+    pushVisualEvent(state, {
+      position: site.position,
+      icon: resource === "wood" ? "🪵" : "🪨",
+      label: `+${formatAmount(amount)}`,
+      resource,
+    });
     complete(citizen);
   }
 
@@ -301,6 +340,14 @@ export class AgentExecutionSystem {
     );
     warehouse.inventory.food = stored + accepted;
     citizen.carriedFood -= accepted;
+    if (accepted > 0) {
+      pushVisualEvent(state, {
+        position: warehouse.position,
+        icon: "📦",
+        label: `+${formatAmount(accepted)}`,
+        resource: "food",
+      });
+    }
     if (citizen.carriedFood > 0) {
       const fallbackFarm = state.buildings.find(
         (building) => building.type === "farm",
@@ -377,6 +424,12 @@ export class AgentExecutionSystem {
     citizen.actionProgress = site.constructionProgress / 100;
     if (site.constructionProgress >= 100) {
       state.mapRevision += 1;
+      pushVisualEvent(state, {
+        position: site.position,
+        icon: "🏠",
+        label: "완성",
+        resource: "construction",
+      });
       complete(citizen);
     }
   }
@@ -407,7 +460,8 @@ export class AgentExecutionSystem {
     config: SimulationConfig,
     random?: SeededRandom,
   ): void {
-    if (!this.atWorkshop(citizen, state, "blacksmith")) {
+    const workshop = findTargetBuilding(citizen, state, "blacksmith");
+    if (!workshop) {
       fail(citizen);
       return;
     }
@@ -427,10 +481,17 @@ export class AgentExecutionSystem {
             config.dailyProductionNoise,
           ) ?? 0),
       );
+      const produced = config.toolsPerAction * noise;
       state.resources.tools = Math.min(
         config.toolsStockTarget,
-        state.resources.tools + config.toolsPerAction * noise,
+        state.resources.tools + produced,
       );
+      pushVisualEvent(state, {
+        position: workshop.position,
+        icon: "🛠️",
+        label: `+${formatAmount(produced)}`,
+        resource: "tools",
+      });
     }
     complete(citizen);
   }
@@ -440,7 +501,8 @@ export class AgentExecutionSystem {
     state: SimulationState,
     config: SimulationConfig,
   ): void {
-    if (!this.atWorkshop(citizen, state, "market")) {
+    const market = findTargetBuilding(citizen, state, "market");
+    if (!market) {
       fail(citizen);
       return;
     }
@@ -450,6 +512,12 @@ export class AgentExecutionSystem {
     }
     // 잉여 상품을 거래해 마을 수입(money)을 만든다.
     state.resources.money += config.marketIncomePerAction;
+    pushVisualEvent(state, {
+      position: market.position,
+      icon: "🪙",
+      label: `+${formatAmount(config.marketIncomePerAction)}`,
+      resource: "money",
+    });
     complete(citizen);
   }
 
@@ -457,14 +525,26 @@ export class AgentExecutionSystem {
     citizen: Citizen,
     state: SimulationState,
   ): void {
-    citizen.actionProgress += 1 / 8;
+    citizen.actionProgress += skillMultiplier(citizen, "logging", 0.5) / 8;
     if (citizen.actionProgress < 1) {
       return;
     }
+    const beforeFirewood = state.resources.firewood;
     convertWoodToFirewood(
       state,
-      1.2 + citizen.skills.logging / 100,
+      (1.2 + citizen.skills.logging / 100) *
+        skillMultiplier(citizen, "logging", 0.25),
     );
+    const produced = state.resources.firewood - beforeFirewood;
+    if (produced > 0) {
+      const site = findTargetBuilding(citizen, state);
+      pushVisualEvent(state, {
+        position: site?.position ?? citizen.position,
+        icon: "🔥",
+        label: `+${formatAmount(produced)}`,
+        resource: "firewood",
+      });
+    }
     complete(citizen);
   }
 
@@ -481,7 +561,7 @@ export class AgentExecutionSystem {
       fail(citizen);
       return;
     }
-    citizen.actionProgress += 1 / 4;
+    citizen.actionProgress += skillMultiplier(citizen, "cooking", 0.25) / 4;
     if (citizen.actionProgress < 1) {
       return;
     }
@@ -492,6 +572,12 @@ export class AgentExecutionSystem {
       building.winter.heatingLevel,
       0.75,
     );
+    pushVisualEvent(state, {
+      position: building.position,
+      icon: "🔥",
+      label: `+${formatAmount(transferred)}`,
+      resource: "heat",
+    });
     complete(citizen);
   }
 
@@ -510,7 +596,9 @@ export class AgentExecutionSystem {
       fail(citizen);
       return;
     }
-    const speed = 14 - Math.min(6, citizen.skills.construction / 18);
+    const speed =
+      (14 - Math.min(6, citizen.skills.construction / 18)) /
+      skillMultiplier(citizen, "construction", 0.35);
     citizen.actionProgress += 1 / speed;
     if (citizen.actionProgress < 1) {
       return;
@@ -519,6 +607,14 @@ export class AgentExecutionSystem {
       type === "repair"
         ? repairBuilding(state, building, day)
         : insulateBuilding(state, building, day);
+    if (succeeded) {
+      pushVisualEvent(state, {
+        position: building.position,
+        icon: type === "repair" ? "🔨" : "🧣",
+        label: type === "repair" ? "수리" : "단열",
+        resource: "construction",
+      });
+    }
     succeeded ? complete(citizen) : fail(citizen);
   }
 
@@ -533,7 +629,7 @@ export class AgentExecutionSystem {
       fail(citizen);
       return;
     }
-    citizen.actionProgress += 1 / 10;
+    citizen.actionProgress += skillMultiplier(citizen, "medicine", 0.55) / 10;
     if (citizen.actionProgress < 1) {
       return;
     }
@@ -545,7 +641,9 @@ export class AgentExecutionSystem {
         state.resources.medicine - 0.25,
       );
     }
-    const skill = 0.65 + citizen.skills.medicine / 130;
+    const skill =
+      (0.65 + citizen.skills.medicine / 130) *
+      skillMultiplier(citizen, "medicine", 0.25);
     patient.winter.illness = Math.max(
       0,
       patient.winter.illness -
@@ -562,6 +660,12 @@ export class AgentExecutionSystem {
     if (state.scenario) {
       state.scenario.careActions += 1;
     }
+    pushVisualEvent(state, {
+      position: patient.position,
+      icon: "💊",
+      label: "치료",
+      resource: "care",
+    });
     complete(citizen);
   }
 
@@ -629,6 +733,41 @@ function findNearestWarehouse(
     })[0];
 }
 
+function findTargetBuilding(
+  citizen: Citizen,
+  state: SimulationState,
+  type?: Building["type"],
+): Building | undefined {
+  return state.buildings.find(
+    (building) =>
+      building.id === citizen.targetId &&
+      building.constructionProgress >= 100 &&
+      (type === undefined || building.type === type),
+  );
+}
+
+function pushVisualEvent(
+  state: SimulationState,
+  event: Omit<SimulationState["visualEvents"][number], "id">,
+): void {
+  const id = `visual-${state.nextVisualEventSerial}`;
+  state.nextVisualEventSerial += 1;
+  state.visualEvents.push({
+    id,
+    position: { ...event.position },
+    icon: event.icon,
+    label: event.label,
+    resource: event.resource,
+  });
+  if (state.visualEvents.length > 80) {
+    state.visualEvents = state.visualEvents.slice(-80);
+  }
+}
+
+function formatAmount(value: number): string {
+  return value >= 10 ? Math.round(value).toString() : value.toFixed(1);
+}
+
 function complete(citizen: Citizen): void {
   citizen.actionState = "completed";
   citizen.actionProgress = 1;
@@ -668,4 +807,13 @@ function updateLegacyAction(citizen: Citizen): void {
   } else {
     citizen.action = "idle";
   }
+}
+
+function skillMultiplier(
+  citizen: Citizen,
+  skill: keyof Citizen["skills"],
+  weight: number,
+): number {
+  const base = 0.75 + (citizen.skills[skill] / 100) * weight;
+  return citizen.specialty === skill ? base + 0.18 : base;
 }
