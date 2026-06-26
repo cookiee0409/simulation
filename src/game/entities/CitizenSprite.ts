@@ -66,22 +66,28 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       .setStrokeStyle(2, 0xffffff, 0)
       .setVisible(false);
     const child = citizen.age < 15;
-    this.shadow = scene.add.circle(1, 6, 6, 0x102017, 0.2);
-    // 코트(몸통) — 직업색 옷, 두툼한 외투
+    const bodyR = child ? 6 : 7.5;
+    const headR = child ? 4.4 : 5.2;
+    this.shadow = scene.add.circle(1, bodyR + 4, bodyR, 0x0c1a12, 0.22);
+    // 몸통(외투) — 직업색의 두툼한 겨울 코트. 눈 배경 대비를 위해 어두운 외곽선.
     this.coatShape = scene.add
-      .circle(0, 2, child ? 4.4 : 5.4, coatColor(citizen), 0.97)
-      .setScale(1, 1.18);
-    // 직업을 나타내는 옷 안단(작은 점)
-    this.bodyShape = scene.add.circle(0, 4, child ? 2 : 2.6, jobColor(citizen), 1);
-    // 머리(피부톤)
-    this.headShape = scene.add.circle(0, child ? -4.6 : -5.4, child ? 3 : 3.4, 0xf0c9a4, 1);
+      .circle(0, 2, bodyR, jobColor(citizen), 1)
+      .setScale(1, 1.28)
+      .setStrokeStyle(1.5, 0x20140c, 0.85);
+    // 목도리(보온/질병 표시)
+    this.bodyShape = scene.add.circle(0, -headR + 2, bodyR * 0.62, coatColor(citizen), 1);
+    // 머리(피부톤) + 외곽선
+    this.headShape = scene.add
+      .circle(0, -headR - 2, headR, 0xf2c9a0, 1)
+      .setStrokeStyle(1.5, 0x6b4a2e, 0.9);
     // 겨울 모자(보온도에 따라 색)
     this.hatShape = scene.add
-      .circle(0, child ? -6.4 : -7.4, child ? 3.1 : 3.6, hatColor(citizen), 1)
-      .setScale(1, 0.62);
+      .circle(0, -headR - 5, headR + 1, hatColor(citizen), 1)
+      .setScale(1, 0.66)
+      .setStrokeStyle(1.5, 0x20140c, 0.8);
     // 추울 때 입김
     this.breathPuff = scene.add
-      .circle(5, -5, 2.2, 0xffffff, 0)
+      .circle(headR + 1, -headR - 1, 3, 0xffffff, 0)
       .setScale(1, 0.8);
     this.specialtyBadge = scene.add
       .text(6, 4, specialtyIcon(citizen.specialty), {
@@ -95,7 +101,7 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       .setOrigin(0.5)
       .setShadow(0, 1, "#ffffff", 2, true, true);
     this.icon = scene.add
-      .text(0, -17, GOAL_ICONS[citizen.goal], {
+      .text(0, -21, GOAL_ICONS[citizen.goal], {
         fontFamily: "Segoe UI Emoji, sans-serif",
         fontSize: "14px",
         color: "#173124",
@@ -106,7 +112,7 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       .setOrigin(0.5)
       .setShadow(0, 1, "#ffffff", 2, true, true);
     this.thoughtBubble = scene.add
-      .text(0, -32, "", {
+      .text(0, -37, "", {
         fontFamily: "Malgun Gothic, system-ui, sans-serif",
         fontSize: "12px",
         fontStyle: "bold",
@@ -148,14 +154,14 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
     this.interpolationElapsed = 0;
     this.interpolationDuration = Math.max(1, interpolationDuration);
     const failed = citizen.actionState === "failed";
-    const dim = failed ? 0.5 : 1;
-    this.coatShape.setFillStyle(coatColor(citizen), failed ? 0.5 : 0.97);
-    this.bodyShape.setFillStyle(jobColor(citizen), dim);
-    this.headShape.setFillStyle(0xf0c9a4, dim);
+    const dim = failed ? 0.55 : 1;
+    this.coatShape.setFillStyle(jobColor(citizen), dim);
+    this.bodyShape.setFillStyle(coatColor(citizen), dim);
+    this.headShape.setFillStyle(0xf2c9a0, dim);
     this.hatShape.setFillStyle(hatColor(citizen), dim);
     // 추위에 떨면 입김이 보인다
     const cold = citizen.winter.bodyTemperature < 36;
-    this.breathPuff.setFillStyle(0xffffff, cold ? 0.8 : 0);
+    this.breathPuff.setFillStyle(0xffffff, cold ? 0.85 : 0);
     this.specialtyBadge.setText(specialtyIcon(citizen.specialty));
     this.icon.setText(
       citizen.actionState === "deciding"
