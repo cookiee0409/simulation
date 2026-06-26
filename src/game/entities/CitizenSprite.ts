@@ -29,6 +29,9 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
   private readonly shadow: Phaser.GameObjects.Arc;
   private readonly bodyShape: Phaser.GameObjects.Arc;
   private readonly coatShape: Phaser.GameObjects.Arc;
+  private readonly headShape: Phaser.GameObjects.Arc;
+  private readonly hatShape: Phaser.GameObjects.Arc;
+  private readonly breathPuff: Phaser.GameObjects.Arc;
   private readonly icon: Phaser.GameObjects.Text;
   private readonly specialtyBadge: Phaser.GameObjects.Text;
   private readonly thoughtBubble: Phaser.GameObjects.Text;
@@ -62,17 +65,24 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       .circle(0, 0, 9, 0xffffff, 0)
       .setStrokeStyle(2, 0xffffff, 0)
       .setVisible(false);
-    this.shadow = scene.add.circle(1, 3, 6, 0x102017, 0.18);
-    this.bodyShape = scene.add.circle(
-      0,
-      0,
-      citizen.age < 15 ? 4 : 5,
-      jobColor(citizen),
-      1,
-    );
+    const child = citizen.age < 15;
+    this.shadow = scene.add.circle(1, 6, 6, 0x102017, 0.2);
+    // 코트(몸통) — 직업색 옷, 두툼한 외투
     this.coatShape = scene.add
-      .circle(0, 2, citizen.age < 15 ? 3 : 4, coatColor(citizen), 0.95)
-      .setScale(1.15, 0.8);
+      .circle(0, 2, child ? 4.4 : 5.4, coatColor(citizen), 0.97)
+      .setScale(1, 1.18);
+    // 직업을 나타내는 옷 안단(작은 점)
+    this.bodyShape = scene.add.circle(0, 4, child ? 2 : 2.6, jobColor(citizen), 1);
+    // 머리(피부톤)
+    this.headShape = scene.add.circle(0, child ? -4.6 : -5.4, child ? 3 : 3.4, 0xf0c9a4, 1);
+    // 겨울 모자(보온도에 따라 색)
+    this.hatShape = scene.add
+      .circle(0, child ? -6.4 : -7.4, child ? 3.1 : 3.6, hatColor(citizen), 1)
+      .setScale(1, 0.62);
+    // 추울 때 입김
+    this.breathPuff = scene.add
+      .circle(5, -5, 2.2, 0xffffff, 0)
+      .setScale(1, 0.8);
     this.specialtyBadge = scene.add
       .text(6, 4, specialtyIcon(citizen.specialty), {
         fontFamily: "Segoe UI Emoji, sans-serif",
@@ -112,8 +122,11 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
     this.add([
       this.selectionRing,
       this.shadow,
-      this.bodyShape,
       this.coatShape,
+      this.bodyShape,
+      this.headShape,
+      this.hatShape,
+      this.breathPuff,
       this.specialtyBadge,
       this.icon,
       this.thoughtBubble,
@@ -134,14 +147,15 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
     this.targetY = citizen.position.y + offset.y;
     this.interpolationElapsed = 0;
     this.interpolationDuration = Math.max(1, interpolationDuration);
-    this.bodyShape.setFillStyle(
-      jobColor(citizen),
-      citizen.actionState === "failed" ? 0.5 : 1,
-    );
-    this.bodyShape.setRadius(citizen.age < 15 ? 4 : 5);
-    this.coatShape
-      .setFillStyle(coatColor(citizen), citizen.actionState === "failed" ? 0.5 : 0.95)
-      .setRadius(citizen.age < 15 ? 3 : 4);
+    const failed = citizen.actionState === "failed";
+    const dim = failed ? 0.5 : 1;
+    this.coatShape.setFillStyle(coatColor(citizen), failed ? 0.5 : 0.97);
+    this.bodyShape.setFillStyle(jobColor(citizen), dim);
+    this.headShape.setFillStyle(0xf0c9a4, dim);
+    this.hatShape.setFillStyle(hatColor(citizen), dim);
+    // 추위에 떨면 입김이 보인다
+    const cold = citizen.winter.bodyTemperature < 36;
+    this.breathPuff.setFillStyle(0xffffff, cold ? 0.8 : 0);
     this.specialtyBadge.setText(specialtyIcon(citizen.specialty));
     this.icon.setText(
       citizen.actionState === "deciding"
@@ -217,6 +231,14 @@ function coatColor(citizen: Citizen): number {
   if (citizen.winter.bodyTemperature < 35.5) return 0x7fa9c8;
   if (citizen.winter.illness >= 35) return 0xa76b7a;
   return 0xefe6cf;
+}
+
+/** 겨울 모자색 — 방한복이 좋을수록 따뜻한 색, 추울수록 차가운 색. */
+function hatColor(citizen: Citizen): number {
+  if (citizen.winter.bodyTemperature < 35.5) return 0x5d7fa0;
+  if (citizen.age < 15) return 0xd06b6b;
+  const warmth = citizen.winter.clothingWarmth ?? 0;
+  return warmth >= 20 ? 0xb5573f : 0x8a6d52;
 }
 
 function specialtyIcon(specialty: Citizen["specialty"]): string {

@@ -336,6 +336,12 @@ export class VillageScene extends Phaser.Scene {
         `농장 ${formatFood(building.inventory.food ?? 0)}`,
       );
     } else if (building.type === "house") {
+      const heated =
+        !!this.snapshot?.scenario &&
+        (building.winter.firewoodStored > 0.3 ||
+          building.winter.indoorTemperature >= 8);
+      const cold =
+        !!this.snapshot?.scenario && building.winter.indoorTemperature < 0;
       this.buildings.fillStyle(COLORS.house, alpha);
       this.buildings.fillRoundedRect(
         building.position.x - 28,
@@ -344,6 +350,10 @@ export class VillageScene extends Phaser.Scene {
         38,
         4,
       );
+      // 따뜻한 집은 창문에 불빛이 켜진다
+      this.buildings.fillStyle(heated ? 0xffd97a : 0x6b5b43, alpha);
+      this.buildings.fillRect(building.position.x - 16, building.position.y - 8, 9, 9);
+      this.buildings.fillRect(building.position.x + 7, building.position.y - 8, 9, 9);
       this.buildings.fillStyle(COLORS.roof, alpha);
       this.buildings.fillTriangle(
         building.position.x - 34,
@@ -353,6 +363,33 @@ export class VillageScene extends Phaser.Scene {
         building.position.x,
         building.position.y - 42,
       );
+      // 지붕에 쌓인 눈
+      this.buildings.fillStyle(0xf4fbff, alpha);
+      this.buildings.fillTriangle(
+        building.position.x - 30,
+        building.position.y - 18,
+        building.position.x + 30,
+        building.position.y - 18,
+        building.position.x,
+        building.position.y - 39,
+      );
+      // 굴뚝과 연기(난방 중) / 서리(추운 집)
+      this.buildings.fillStyle(0x6a5240, alpha);
+      this.buildings.fillRect(building.position.x + 12, building.position.y - 40, 7, 12);
+      if (heated) {
+        this.buildings.fillStyle(0xd9dde2, 0.55 * alpha);
+        this.buildings.fillCircle(building.position.x + 15, building.position.y - 46, 4);
+        this.buildings.fillCircle(building.position.x + 19, building.position.y - 53, 5);
+      } else if (cold) {
+        this.buildings.fillStyle(0x9fc6e8, 0.28);
+        this.buildings.fillRoundedRect(
+          building.position.x - 28,
+          building.position.y - 18,
+          56,
+          38,
+          4,
+        );
+      }
       if (underConstruction) {
         this.addBuildingLabel(
           building,

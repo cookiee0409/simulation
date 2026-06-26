@@ -1,6 +1,6 @@
 import type { SimulationConfig } from "../../core/SimulationConfig";
 import type { SeededRandom } from "../../core/SeededRandom";
-import type { Citizen, SimulationState } from "../../types";
+import type { Citizen, CitizenJob, SimulationState } from "../../types";
 import type { ScenarioDefinition } from "../ScenarioDefinition";
 
 export function scenarioConfigOverrides(
@@ -41,17 +41,11 @@ export function initializeMountainWinterState(
   const citizens = [...state.citizens].sort((a, b) =>
     a.id.localeCompare(b.id),
   );
+  const jobPlan = assignWinterJobs(citizens.length);
   for (let index = 0; index < citizens.length; index += 1) {
     const citizen = citizens[index]!;
     citizen.age = scenarioAge(index, citizens.length, definition, random);
-    citizen.job =
-      index < 7
-        ? "farmer"
-        : index < 12
-          ? "lumberjack"
-          : index < 15
-            ? "carpenter"
-          : "settler";
+    citizen.job = jobPlan[index] ?? "settler";
     boostJobSkills(citizen);
     citizen.specialty = dominantSkill(citizen.skills);
     citizen.winter.clothingWarmth += index < clothingCount ? 25 : 0;
@@ -89,16 +83,40 @@ function scenarioAge(
   return random.integer(18, 58);
 }
 
+/**
+ * 인구 규모와 무관하게 모든 직업이 등장하도록 비율 기반으로 배정한다(소규모 설정 호환).
+ * 생존에 직접 기여하는 농부·벌목꾼·목수를 우선하고, 대장장이(도구·수리)·상인(결속)도 포함한다.
+ */
+function assignWinterJobs(count: number): CitizenJob[] {
+  const order: CitizenJob[] = [];
+  const push = (job: CitizenJob, ratio: number, min: number) => {
+    const n = Math.max(min, Math.round(count * ratio));
+    for (let i = 0; i < n; i += 1) order.push(job);
+  };
+  push("farmer", 0.34, 1);
+  push("lumberjack", 0.2, 1);
+  push("carpenter", 0.12, 1);
+  push("blacksmith", 0.08, count >= 8 ? 1 : 0);
+  push("merchant", 0.08, count >= 10 ? 1 : 0);
+  while (order.length < count) order.push("settler");
+  return order.slice(0, count);
+}
+
 function boostJobSkills(citizen: Citizen): void {
   if (citizen.job === "farmer") {
     citizen.skills.farming = Math.max(citizen.skills.farming, 68);
   } else if (citizen.job === "lumberjack") {
     citizen.skills.logging = Math.max(citizen.skills.logging, 68);
   } else if (citizen.job === "carpenter") {
-    citizen.skills.construction = Math.max(
-      citizen.skills.construction,
-      72,
-    );
+    citizen.skills.construction = Math.max(citizen.skills.construction, 72);
+  } else if (citizen.job === "blacksmith") {
+    // 대장장이: 도구·연장을 다뤄 수리·건축과 벌목에 강하다.
+    citizen.skills.construction = Math.max(citizen.skills.construction, 64);
+    citizen.skills.logging = Math.max(citizen.skills.logging, 52);
+  } else if (citizen.job === "merchant") {
+    // 상인: 교섭·통솔로 마을 결속을 돕는다(이주 억제·사기).
+    citizen.skills.negotiation = Math.max(citizen.skills.negotiation, 68);
+    citizen.skills.leadership = Math.max(citizen.skills.leadership, 58);
   }
   if (citizen.traits.empathy >= 65) {
     citizen.skills.medicine = Math.max(citizen.skills.medicine, 45);
