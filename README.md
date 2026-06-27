@@ -173,3 +173,6 @@ const engine = new SimulationEngine({
 - [ ] 다수 NPC 간 국소 충돌 회피
 - [ ] 9:16 촬영 모드와 비교 실험
 - [ ] 외부 LLM 전략 제공자 구현
+# Visual System
+
+새 렌더링/에셋 규격 문서는 [docs/visual-system.md](docs/visual-system.md)를 참고하세요.

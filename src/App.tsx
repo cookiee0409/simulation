@@ -244,6 +244,7 @@ export default function App() {
 
       <section className="dashboard">
         <div className="village-panel">
+          <VisualHud snapshot={snapshot} />
           <VillageCanvas
             snapshot={snapshot}
             selectedCitizenId={selectedCitizenId}
@@ -594,6 +595,30 @@ function OutcomeCard({ snapshot }: { snapshot: SimulationSnapshot }) {
 
 function Metric({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
   return <div className={warning ? "metric warning" : "metric"}><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function VisualHud({ snapshot }: { snapshot: SimulationSnapshot }) {
+  return (
+    <div className="visual-hud" aria-label="마을 핵심 상태">
+      <span>D{snapshot.day}</span>
+      <span>{snapshot.speed}×</span>
+      <span>인구 {snapshot.citizens.length}</span>
+      <span>식량 {format(snapshot.resources.food)}</span>
+      <span>목재 {format(snapshot.resources.wood)}</span>
+      <span>석재 {format(snapshot.resources.stone)}</span>
+      <span>{stageLabel(snapshot.stage)}</span>
+    </div>
+  );
+}
+
+function stageLabel(stage: SimulationSnapshot["stage"]): string {
+  return {
+    camp: "캠프",
+    hamlet: "작은 촌락",
+    village: "마을",
+    growing_village: "성장 마을",
+    town: "소도시",
+  }[stage];
 }
 
 function phaseLabel(phase?: string): string {
