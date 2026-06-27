@@ -240,39 +240,6 @@ export class TaskBoardSystem {
           ),
         );
       }
-      if (
-        house.winter.structuralCondition < 82 &&
-        state.resources.wood >= WINTER_BALANCE.repairWoodCost &&
-        state.resources.stone >= WINTER_BALANCE.repairStoneCost
-      ) {
-        tasks.push(
-          createTask(
-            `repair-shelter:${house.id}`,
-            "repair_shelter",
-            house.id,
-            house.entrance,
-            55 + urgency("shelter_repair") * 0.5,
-            2,
-            previousAssignments,
-          ),
-        );
-      }
-      if (
-        house.winter.insulation < 72 &&
-        state.resources.wood >= WINTER_BALANCE.insulationWoodCost
-      ) {
-        tasks.push(
-          createTask(
-            `insulate-shelter:${house.id}`,
-            "insulate_shelter",
-            house.id,
-            house.entrance,
-            52 + urgency("insulation") * 0.5,
-            2,
-            previousAssignments,
-          ),
-        );
-      }
     }
 
     for (const patient of state.citizens

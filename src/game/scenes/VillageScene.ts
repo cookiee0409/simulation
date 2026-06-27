@@ -395,11 +395,6 @@ export class VillageScene extends Phaser.Scene {
           building,
           `건설 ${Math.round(building.constructionProgress)}%`,
         );
-      } else if (this.snapshot?.scenario) {
-        this.addBuildingLabel(
-          building,
-          `${building.winter.indoorTemperature.toFixed(0)}° · 단열 ${Math.round(building.winter.insulation)} · 🔥${building.winter.firewoodStored.toFixed(1)}`,
-        );
       }
     } else if (building.type === "lumberjack") {
       this.buildings.fillStyle(COLORS.lumberjack, alpha);

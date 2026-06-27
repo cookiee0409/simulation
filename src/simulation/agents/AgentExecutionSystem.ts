@@ -910,11 +910,16 @@ function updateLegacyAction(citizen: Citizen): void {
   }
 }
 
+/**
+ * 작업 효율은 해당 작업의 숙련도로 결정된다. 숙련도가 낮으면 느리고, 높으면 빠르다.
+ * (예: 농사 숙련 70 농부는 숙련 20 비숙련자보다 작업이 2배가량 빠르다.)
+ * 전문 분야가 일치하면 추가 보너스.
+ */
 function skillMultiplier(
   citizen: Citizen,
   skill: keyof Citizen["skills"],
   weight: number,
 ): number {
-  const base = 0.75 + (citizen.skills[skill] / 100) * weight;
-  return citizen.specialty === skill ? base + 0.18 : base;
+  const base = 0.62 + (citizen.skills[skill] / 100) * (weight + 0.5);
+  return citizen.specialty === skill ? base + 0.22 : base;
 }

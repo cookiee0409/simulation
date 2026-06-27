@@ -44,15 +44,6 @@ export function updateWinterNeeds(
       citizen.winter.illness >= 35 ||
       citizen.health < 55,
   ).length;
-  const worstCondition = shelters.reduce(
-    (minimum, building) =>
-      Math.min(minimum, building.winter.structuralCondition),
-    100,
-  );
-  const worstInsulation = shelters.reduce(
-    (minimum, building) => Math.min(minimum, building.winter.insulation),
-    100,
-  );
   const outlook =
     runtime.foodSecurityDays + runtime.firewoodSecurityDays;
 
@@ -83,20 +74,6 @@ export function updateWinterNeeds(
       state.resources.food,
       dailyFood * remainingWinterDays,
       "겨울 식량 전망",
-    ),
-    need(
-      "shelter_repair",
-      clamp(100 - worstCondition, 0, 100),
-      worstCondition,
-      100,
-      "주택 구조 상태",
-    ),
-    need(
-      "insulation",
-      clamp(100 - worstInsulation, 0, 100),
-      worstInsulation,
-      100,
-      "주택 단열 상태",
     ),
     need(
       "medicine",

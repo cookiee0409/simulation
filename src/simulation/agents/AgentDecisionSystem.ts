@@ -218,26 +218,6 @@ export function chooseGoal(
       ];
       candidates.push(candidate("heat_home", task, reasons));
     }
-    for (const task of tasksByType("repair_shelter")) {
-      const reasons = [
-        reason("주택 손상", winterUrgency("shelter_repair") * 0.9),
-        reason("건축 기술", citizen.skills.construction * 0.5),
-        reason("전문 분야", specialtyBonus(citizen, "construction", 18)),
-        reason("마을 애착", citizen.traits.attachmentToVillage * 0.14),
-        reason("배고픔", -citizen.hunger * 0.25),
-      ];
-      candidates.push(candidate("repair_shelter", task, reasons));
-    }
-    for (const task of tasksByType("insulate_shelter")) {
-      const reasons = [
-        reason("단열 필요", winterUrgency("insulation") * 0.88),
-        reason("건축 기술", citizen.skills.construction * 0.46),
-        reason("전문 분야", specialtyBonus(citizen, "construction", 16)),
-        reason("인내심", citizen.traits.patience * 0.12),
-        reason("배고픔", -citizen.hunger * 0.25),
-      ];
-      candidates.push(candidate("insulate_shelter", task, reasons));
-    }
     for (const task of tasksByType("care_sick")) {
       if (task.targetId === citizen.id) {
         continue;

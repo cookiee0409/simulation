@@ -1,31 +1,6 @@
 import Phaser from "phaser";
 import type { Citizen } from "../../simulation";
 
-const GOAL_ICONS: Record<Citizen["goal"], string> = {
-  eat: "🍞",
-  forage: "🧺",
-  work_farm: "🌾",
-  gather_wood: "🪓",
-  gather_stone: "⛏️",
-  work_carpentry: "🪚",
-  work_blacksmith: "🔨",
-  work_market: "🪙",
-  process_firewood: "🪵",
-  heat_home: "🔥",
-  repair_shelter: "🔨",
-  insulate_shelter: "🧱",
-  care_sick: "🩺",
-  migrate: "🚶",
-  forge_tools: "🔨",
-  trade_supplies: "🛒",
-  carry_food: "📦",
-  rest: "💤",
-  return_home: "🏠",
-  seek_work: "?",
-  build: "🔨",
-  wander: "…",
-};
-
 export class CitizenSprite extends Phaser.GameObjects.Container {
   readonly citizenId: string;
   private readonly shadow: Phaser.GameObjects.Arc;
@@ -34,9 +9,7 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
   private readonly headShape: Phaser.GameObjects.Arc;
   private readonly hatShape: Phaser.GameObjects.Arc;
   private readonly breathPuff: Phaser.GameObjects.Arc;
-  private readonly icon: Phaser.GameObjects.Text;
   private readonly specialtyBadge: Phaser.GameObjects.Text;
-  private readonly thoughtBubble: Phaser.GameObjects.Text;
   private readonly selectionRing: Phaser.GameObjects.Arc;
   private readonly progress: Phaser.GameObjects.Graphics;
   private startX: number;
@@ -102,30 +75,6 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5)
       .setShadow(0, 1, "#ffffff", 2, true, true);
-    this.icon = scene.add
-      .text(0, -21, GOAL_ICONS[citizen.goal], {
-        fontFamily: "Segoe UI Emoji, sans-serif",
-        fontSize: "14px",
-        color: "#173124",
-        backgroundColor: "rgba(255,255,255,0.9)",
-        padding: { x: 3, y: 2 },
-        resolution: 2,
-      })
-      .setOrigin(0.5)
-      .setShadow(0, 1, "#ffffff", 2, true, true);
-    this.thoughtBubble = scene.add
-      .text(0, -37, "", {
-        fontFamily: "Malgun Gothic, system-ui, sans-serif",
-        fontSize: "12px",
-        fontStyle: "bold",
-        color: "#213329",
-        backgroundColor: "rgba(255,255,255,0.96)",
-        padding: { x: 7, y: 3 },
-        resolution: 2,
-      })
-      .setOrigin(0.5, 1)
-      .setShadow(0, 1, "#ffffff", 2, true, true)
-      .setVisible(false);
     this.progress = scene.add.graphics();
     this.add([
       this.selectionRing,
@@ -136,8 +85,6 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       this.hatShape,
       this.breathPuff,
       this.specialtyBadge,
-      this.icon,
-      this.thoughtBubble,
       this.progress,
     ]);
     this.setSize(18, 18);
@@ -165,19 +112,6 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
     const cold = citizen.winter.bodyTemperature < 36;
     this.breathPuff.setFillStyle(0xffffff, cold ? 0.85 : 0);
     this.specialtyBadge.setText(specialtyIcon(citizen.specialty));
-    this.icon.setText(
-      citizen.actionState === "deciding"
-        ? "…"
-        : GOAL_ICONS[citizen.goal],
-    );
-    if (citizen.thought) {
-      this.thoughtBubble
-        .setText(citizen.thought.label)
-        .setVisible(true)
-        .setAlpha(Phaser.Math.Clamp(citizen.thought.urgency / 100, 0.72, 1));
-    } else {
-      this.thoughtBubble.setVisible(false);
-    }
     this.progress.clear();
     if (citizen.actionState === "performing") {
       this.progress.fillStyle(0x173124, 0.25);

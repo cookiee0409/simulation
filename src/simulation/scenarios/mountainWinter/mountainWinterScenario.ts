@@ -59,8 +59,6 @@ export const mountainWinterScenario: ScenarioDefinition = {
     "food_production",
     "food_transport",
     "eat",
-    "repair_shelter",
-    "insulate_shelter",
     "care_sick",
     "rest",
     "individual_migration",

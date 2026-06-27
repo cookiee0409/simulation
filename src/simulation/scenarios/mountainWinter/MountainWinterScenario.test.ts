@@ -69,13 +69,14 @@ describe("mountain winter scenario", () => {
       }
     }
     const outcome = engine.getSnapshot().scenario?.outcome;
-    expect(outcome!.repairsCompleted).toBeGreaterThan(0);
-    expect(outcome!.insulationUpgrades).toBeGreaterThan(0);
     expect(outcome!.careActions).toBeGreaterThan(0);
     expect(goals.has("work_farm")).toBe(true);
     expect(
       goals.has("gather_wood") || goals.has("process_firewood"),
     ).toBe(true);
+    // 단열·주택 수리 행동은 제거되었으므로 선택되지 않는다.
+    expect(goals.has("repair_shelter")).toBe(false);
+    expect(goals.has("insulate_shelter")).toBe(false);
   }, 20_000);
 
   it("heating protects body temperature and insulation reduces fuel demand", () => {

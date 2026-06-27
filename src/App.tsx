@@ -356,10 +356,11 @@ function CitizenPanel({ citizen }: { citizen: Citizen }) {
         <div><dt>추위 노출</dt><dd>{format(citizen.winter.coldExposure)}</dd></div>
         <div><dt>질병</dt><dd>{format(citizen.winter.illness)}</dd></div>
         <div><dt>건강</dt><dd>{format(citizen.health)}</dd></div>
+        <div><dt>농사 기술</dt><dd>{format(citizen.skills.farming)}</dd></div>
         <div><dt>벌목 기술</dt><dd>{format(citizen.skills.logging)}</dd></div>
         <div><dt>건축 기술</dt><dd>{format(citizen.skills.construction)}</dd></div>
+        <div><dt>교섭 기술</dt><dd>{format(citizen.skills.negotiation)}</dd></div>
         <div><dt>의료 기술</dt><dd>{format(citizen.skills.medicine)}</dd></div>
-        <div><dt>마을 애착</dt><dd>{format(citizen.traits.attachmentToVillage)}</dd></div>
       </dl>
       <div className="decision-reasons">
         <b>행동 선택 점수 {format(citizen.decisionScore)}</b>
