@@ -15,6 +15,8 @@ const DEFAULT_SEED = "mountain-winter-001";
 const DEFAULT_SETTINGS: SetupSettings = {
   seed: DEFAULT_SEED,
   npcCount: 10,
+  houseCount: 6,
+  farmCount: 2,
   winterStartDay: 20,
   winterEndDay: 55,
 };
@@ -22,6 +24,8 @@ const DEFAULT_SETTINGS: SetupSettings = {
 interface SetupSettings {
   seed: string;
   npcCount: number;
+  houseCount: number;
+  farmCount: number;
   winterStartDay: number;
   winterEndDay: number;
 }
@@ -147,7 +151,7 @@ export default function App() {
         <div>
           <p className="eyebrow">SETUP</p>
           <h2>시작 전 세부 설정</h2>
-          <p>NPC 수, 혹한기 시작/종료일, 시드를 바꾸고 새 시뮬레이션을 시작합니다.</p>
+          <p>NPC·집·농장 수, 혹한기 시작/종료일, 시드를 바꾸고 새 시뮬레이션을 시작합니다.</p>
         </div>
         <label>
           <span>시드</span>
@@ -169,6 +173,36 @@ export default function App() {
               setSetup((current) => ({
                 ...current,
                 npcCount: Number(event.target.value),
+              }))
+            }
+          />
+        </label>
+        <label>
+          <span>집 수</span>
+          <input
+            type="number"
+            min={1}
+            max={40}
+            value={setup.houseCount}
+            onChange={(event) =>
+              setSetup((current) => ({
+                ...current,
+                houseCount: Number(event.target.value),
+              }))
+            }
+          />
+        </label>
+        <label>
+          <span>농장 수</span>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            value={setup.farmCount}
+            onChange={(event) =>
+              setSetup((current) => ({
+                ...current,
+                farmCount: Number(event.target.value),
               }))
             }
           />
@@ -232,14 +266,16 @@ export default function App() {
           <div className="metric-grid">
             <Metric label="생존 주민" value={`${snapshot.citizens.length}명`} />
             <Metric label="환자" value={`${sickResidents}명`} warning={sickResidents > 0} />
-            <Metric label="식량" value={format(snapshot.resources.food)} />
-            <Metric label="땔감" value={format(snapshot.resources.firewood)} warning={snapshot.resources.firewood < 8} />
-            <Metric label="원목" value={format(snapshot.resources.wood)} />
-            <Metric label="의약품" value={format(snapshot.resources.medicine)} />
-            <Metric label="난방 주택" value={`${heatedHouses}/${houseCount}`} />
+            <Metric label="난방 주택" value={`${heatedHouses}/${houseCount}`} warning={heatedHouses < houseCount} />
             <Metric label="이주" value={`${scenario?.migrated ?? 0}명`} />
           </div>
 
+          <VillageGoal snapshot={snapshot} heatedHouses={heatedHouses} houseCount={houseCount} />
+          <ResourceReadout
+            snapshot={snapshot}
+            heatedHouses={heatedHouses}
+            houseCount={houseCount}
+          />
           <WinterNeeds snapshot={snapshot} />
           {selectedCitizen ? (
             <CitizenPanel citizen={selectedCitizen} />
@@ -293,11 +329,24 @@ function createEngine(settings: SetupSettings, paused = false): SimulationEngine
 }
 
 function createScenario(settings: SetupSettings): ScenarioDefinition {
+  // 시작 설정의 집·농장 수를 반영해 초기 건물 구성을 덮어쓴다.
+  const initialBuildings = mountainWinterScenario.initialBuildings.map(
+    (preset) => {
+      if (preset.type === "house") {
+        return { ...preset, count: settings.houseCount };
+      }
+      if (preset.type === "farm") {
+        return { ...preset, count: settings.farmCount };
+      }
+      return { ...preset };
+    },
+  );
   return {
     ...mountainWinterScenario,
     durationDays: settings.winterEndDay,
     preparationDays: settings.winterStartDay,
     initialPopulation: settings.npcCount,
+    initialBuildings,
   };
 }
 
@@ -311,6 +360,8 @@ function sanitizeSetup(settings: SetupSettings): SetupSettings {
   return {
     seed: settings.seed.trim() || DEFAULT_SEED,
     npcCount,
+    houseCount: clampInteger(settings.houseCount, 1, 40),
+    farmCount: clampInteger(settings.farmCount, 0, 20),
     winterStartDay,
     winterEndDay,
   };
@@ -322,6 +373,126 @@ function clampInteger(value: number, min: number, max: number): number {
   }
   return Math.min(max, Math.max(min, Math.round(value)));
 }
+
+interface PanelProps {
+  snapshot: SimulationSnapshot;
+  heatedHouses: number;
+  houseCount: number;
+}
+
+function ResourceReadout({ snapshot, heatedHouses, houseCount }: PanelProps) {
+  const sc = snapshot.scenario;
+  const r = snapshot.resources;
+  const foodDays = sc?.foodSecurityDays ?? 0;
+  const fireDays = sc?.firewoodSecurityDays ?? 0;
+  const housingShort = Math.max(0, houseCount - heatedHouses);
+  const rows: Array<{ label: string; value: string; status: ResourceStatus }> = [
+    {
+      label: "식량",
+      value: `${format(r.food)} · 약 ${Math.round(foodDays)}일분`,
+      status: daysStatus(foodDays),
+    },
+    {
+      label: "땔감",
+      value: `${format(r.firewood)} · 약 ${Math.round(fireDays)}일분`,
+      status: daysStatus(fireDays),
+    },
+    {
+      label: "원목",
+      value: r.wood <= 0 ? `${format(r.wood)} · 생산 중단 가능` : format(r.wood),
+      status: r.wood <= 0 ? "위험" : r.wood < 8 ? "주의" : "충분",
+    },
+    {
+      label: "도구",
+      value: format(r.tools),
+      status: r.tools > 0 ? "충분" : "주의",
+    },
+    {
+      label: "난방 주택",
+      value:
+        housingShort > 0
+          ? `${heatedHouses}/${houseCount} · ${housingShort}채 부족`
+          : `${heatedHouses}/${houseCount} · 모두 난방`,
+      status: housingShort > 0 ? (housingShort >= 3 ? "위험" : "주의") : "충분",
+    },
+  ];
+  return (
+    <div className="profession-board">
+      <b>자원 현황</b>
+      <div className="resource-readout">
+        {rows.map((row) => (
+          <div className="resource-row" key={row.label}>
+            <span className="resource-name">{row.label}</span>
+            <span className="resource-value">{row.value}</span>
+            <span className={`resource-status status-${row.status}`}>
+              {row.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VillageGoal({ snapshot, heatedHouses, houseCount }: PanelProps) {
+  const sc = snapshot.scenario;
+  if (!sc) {
+    return null;
+  }
+  const topNeeds = [...snapshot.winterNeeds]
+    .filter((need) => need.urgency >= 35)
+    .sort((a, b) => b.urgency - a.urgency)
+    .slice(0, 3);
+  const goal =
+    heatedHouses < houseCount
+      ? `모든 주택 난방 (${heatedHouses}/${houseCount})`
+      : "식량·땔감 비축 유지";
+  const threat =
+    sc.phase === "preparation"
+      ? `한파까지 ${sc.daysUntilWinter}일`
+      : sc.phase === "ended"
+        ? "시나리오 종료"
+        : `예상 최저 ${Math.round(sc.expectedMinimumTemperature)}°C`;
+  const priority = topNeeds[0]
+    ? PRIORITY_WORK[topNeeds[0].type] ?? "현 상태 유지"
+    : "현 상태 유지";
+  return (
+    <div className="profession-board village-goal">
+      <b>마을 목표</b>
+      <dl className="goal-facts">
+        <div><dt>현재 목표</dt><dd>{goal}</dd></div>
+        <div><dt>다음 위협</dt><dd>{threat}</dd></div>
+        <div>
+          <dt>부족 자원</dt>
+          <dd>
+            {topNeeds.length > 0
+              ? topNeeds.map((n) => winterNeedLabel(n.type)).join(", ")
+              : "없음"}
+          </dd>
+        </div>
+        <div><dt>우선 작업</dt><dd>{priority}</dd></div>
+      </dl>
+    </div>
+  );
+}
+
+type ResourceStatus = "충분" | "주의" | "부족" | "위험";
+
+function daysStatus(days: number): ResourceStatus {
+  if (days >= 7) return "충분";
+  if (days >= 3) return "주의";
+  if (days >= 1) return "부족";
+  return "위험";
+}
+
+const PRIORITY_WORK: Record<string, string> = {
+  firewood: "벌목·땔감 생산",
+  winter_food: "농사·식량 확보",
+  warmth: "주택 난방",
+  medicine: "환자 돌봄",
+  migration: "이탈 위험 관리",
+  wood: "벌목",
+};
 
 function WinterNeeds({ snapshot }: { snapshot: SimulationSnapshot }) {
   return (

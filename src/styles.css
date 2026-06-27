@@ -646,3 +646,43 @@ h1 {
   text-align: right;
   color: #46603f;
 }
+
+/* 요청서: 자원 해석 + 마을 목표 패널 */
+.resource-readout {
+  display: grid;
+  gap: 5px;
+  margin-top: 6px;
+}
+.resource-row {
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.resource-name { color: #46603f; font-weight: 600; }
+.resource-value { color: #213329; }
+.resource-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  text-align: center;
+}
+.status-충분 { background: #def0d6; color: #2e6b33; }
+.status-주의 { background: #fbeecb; color: #8a6a1f; }
+.status-부족 { background: #f8dcc0; color: #9a531f; }
+.status-위험 { background: #f6cdcd; color: #a32c2c; }
+.village-goal .goal-facts {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+.village-goal .goal-facts > div {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 8px;
+  font-size: 12px;
+}
+.village-goal dt { color: #46603f; font-weight: 600; }
+.village-goal dd { margin: 0; color: #213329; }

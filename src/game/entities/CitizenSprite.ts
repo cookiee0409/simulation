@@ -1,6 +1,47 @@
 import Phaser from "phaser";
 import type { Citizen } from "../../simulation";
 
+/** 목표 → 머리 위에 보일 짧은 행동 텍스트. */
+const ACTION_LABELS: Record<Citizen["goal"], string> = {
+  eat: "식사",
+  forage: "채집",
+  work_farm: "농사",
+  gather_wood: "벌목",
+  gather_stone: "채석",
+  work_carpentry: "목공",
+  work_blacksmith: "대장일",
+  work_market: "장사",
+  process_firewood: "땔감 제작",
+  heat_home: "난방",
+  repair_shelter: "수리",
+  insulate_shelter: "단열",
+  care_sick: "돌봄",
+  migrate: "이주",
+  forge_tools: "도구 제작",
+  trade_supplies: "교역",
+  carry_food: "운반",
+  rest: "휴식",
+  return_home: "귀가",
+  seek_work: "일 찾는 중",
+  build: "건설",
+  wander: "대기",
+};
+
+/** 현재 상태를 사람이 읽을 수 있는 한 줄 행동 텍스트로 변환한다. */
+function actionText(citizen: Citizen): string {
+  if (citizen.actionState === "moving") {
+    return "이동 중";
+  }
+  if (citizen.actionState === "deciding") {
+    return "대기 중";
+  }
+  const label = ACTION_LABELS[citizen.goal];
+  if (citizen.actionState === "performing") {
+    return `${label} 중 ${Math.round(citizen.actionProgress * 100)}%`;
+  }
+  return `${label} 중`;
+}
+
 export class CitizenSprite extends Phaser.GameObjects.Container {
   readonly citizenId: string;
   private readonly shadow: Phaser.GameObjects.Arc;
@@ -10,6 +51,7 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
   private readonly hatShape: Phaser.GameObjects.Arc;
   private readonly breathPuff: Phaser.GameObjects.Arc;
   private readonly specialtyBadge: Phaser.GameObjects.Text;
+  private readonly actionLabel: Phaser.GameObjects.Text;
   private readonly selectionRing: Phaser.GameObjects.Arc;
   private readonly progress: Phaser.GameObjects.Graphics;
   private startX: number;
@@ -75,6 +117,18 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5)
       .setShadow(0, 1, "#ffffff", 2, true, true);
+    this.actionLabel = scene.add
+      .text(0, -headR - 14, actionText(citizen), {
+        fontFamily: "Malgun Gothic, system-ui, sans-serif",
+        fontSize: "11px",
+        fontStyle: "bold",
+        color: "#1b2c20",
+        backgroundColor: "rgba(255,255,255,0.86)",
+        padding: { x: 4, y: 1 },
+        resolution: 2,
+      })
+      .setOrigin(0.5, 1)
+      .setShadow(0, 1, "#ffffff", 2, true, true);
     this.progress = scene.add.graphics();
     this.add([
       this.selectionRing,
@@ -85,6 +139,7 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
       this.hatShape,
       this.breathPuff,
       this.specialtyBadge,
+      this.actionLabel,
       this.progress,
     ]);
     this.setSize(18, 18);
@@ -112,6 +167,7 @@ export class CitizenSprite extends Phaser.GameObjects.Container {
     const cold = citizen.winter.bodyTemperature < 36;
     this.breathPuff.setFillStyle(0xffffff, cold ? 0.85 : 0);
     this.specialtyBadge.setText(specialtyIcon(citizen.specialty));
+    this.actionLabel.setText(actionText(citizen)).setAlpha(failed ? 0.55 : 1);
     this.progress.clear();
     if (citizen.actionState === "performing") {
       this.progress.fillStyle(0x173124, 0.25);
