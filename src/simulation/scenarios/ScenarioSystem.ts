@@ -1,5 +1,6 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
+import { recordMemory } from "../life/LifeStorySystem";
 import type {
   ScenarioEvent,
   ScenarioOutcome,
@@ -231,6 +232,15 @@ function finishScenario(
     insulationUpgrades: runtime.insulationUpgrades,
     careActions: runtime.careActions,
   };
+  for (const citizen of state.citizens) {
+    recordMemory(
+      citizen,
+      day,
+      "winter_survived",
+      "혹독한 겨울에서 살아남았다",
+      "good",
+    );
+  }
   recordScenarioEvent(state, {
     type: "winter_ended",
     day,

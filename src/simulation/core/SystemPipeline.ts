@@ -54,6 +54,7 @@ export function createDefaultSystems(): SimulationSystem[] {
           context.state,
           context.config,
           context.random,
+          context.day,
         );
       },
     },
@@ -70,6 +71,7 @@ export function createDefaultSystems(): SimulationSystem[] {
           context.state,
           context.config,
           context.random,
+          context.day,
         );
       },
     },
@@ -86,6 +88,7 @@ export function createDefaultSystems(): SimulationSystem[] {
           context.state,
           context.config,
           context.random,
+          context.day,
         );
       },
     },
@@ -117,6 +120,7 @@ export function createScenarioSystems(
           context.state,
           context.config,
           context.random,
+          context.day,
         );
       },
     },

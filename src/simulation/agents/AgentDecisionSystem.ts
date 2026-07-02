@@ -9,6 +9,7 @@ import type {
   SimulationState,
   VillageTask,
 } from "../types";
+import { createPersonalReasonResolver } from "../life/LifeStorySystem";
 import { TaskBoardSystem } from "../tasks/TaskBoardSystem";
 
 interface DecisionCandidate {
@@ -385,6 +386,22 @@ export function chooseGoal(
     score: 6,
     reasons: [reason("짧은 대기", 6)],
   });
+
+  // 기억과 꿈이 남기는 개인적 이유(±12 이내). 같은 상황에서도
+  // 굶어 본 사람, 장인을 꿈꾸는 사람이 서로 다른 선택을 하게 한다.
+  const personalReasonsFor = createPersonalReasonResolver(
+    citizen,
+    perception.day,
+  );
+  for (const item of candidates) {
+    for (const personal of personalReasonsFor(item.goal)) {
+      item.reasons.push({
+        factor: personal.factor,
+        score: round(personal.score),
+      });
+      item.score += personal.score;
+    }
+  }
 
   const maxScore = Math.max(...candidates.map((item) => item.score));
   const tied = candidates

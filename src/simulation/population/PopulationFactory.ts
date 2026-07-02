@@ -1,5 +1,9 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
+import {
+  createAspiration,
+  createCitizenName,
+} from "../life/LifeStorySystem";
 import type { Building, Citizen, GridPosition } from "../types";
 
 export function createCitizens(
@@ -16,10 +20,32 @@ export function createCitizens(
     const home = completedHouses[Math.floor(index / config.houseCapacity)];
     const position = createStartingPosition(index, home, config);
     const skills = createSkills(random);
+    const traits = {
+      cooperation: random.integer(0, 100),
+      riskTolerance: random.integer(0, 100),
+      savingPreference: random.integer(0, 100),
+      empathy: random.integer(0, 100),
+      selfishness: random.integer(0, 100),
+      leadership: random.integer(0, 100),
+      patience: random.integer(0, 100),
+      attachmentToVillage: random.integer(0, 100),
+      ruleFollowing: random.integer(0, 100),
+    };
+    const specialty = dominantSkill(skills);
     citizens.push({
       id: `citizen-${String(index + 1).padStart(3, "0")}`,
+      name: createCitizenName(random),
       age: random.integer(config.founderAgeMin, config.founderAgeMax),
       job: "settler",
+      aspiration: createAspiration(traits, skills, specialty),
+      memories: [
+        {
+          day: 0,
+          type: "founder",
+          label: "이 땅에 마을을 개척하러 왔다",
+          sentiment: "neutral",
+        },
+      ],
       position,
       homeId: home?.id,
       wealth: random.between(80, 120),
@@ -29,19 +55,9 @@ export function createCitizens(
       canWork: true,
       action: "idle",
       groupId: `group-${random.integer(1, 4)}`,
-      traits: {
-        cooperation: random.integer(0, 100),
-        riskTolerance: random.integer(0, 100),
-        savingPreference: random.integer(0, 100),
-        empathy: random.integer(0, 100),
-        selfishness: random.integer(0, 100),
-        leadership: random.integer(0, 100),
-        patience: random.integer(0, 100),
-        attachmentToVillage: random.integer(0, 100),
-        ruleFollowing: random.integer(0, 100),
-      },
+      traits,
       skills,
-      specialty: dominantSkill(skills),
+      specialty,
       winter: createWinterState(random),
       fatigue: random.between(0, 12),
       goal: "wander",
@@ -69,13 +85,36 @@ export function createChild(
   config: SimulationConfig,
   random: SeededRandom,
   home: Building | undefined,
+  birthDay = 0,
 ): Citizen {
   const base = home?.entrance ?? { x: config.mapWidth / 2, y: config.mapHeight / 2 };
   const skills = createSkills(random);
+  const traits = {
+    cooperation: random.integer(0, 100),
+    riskTolerance: random.integer(0, 100),
+    savingPreference: random.integer(0, 100),
+    empathy: random.integer(0, 100),
+    selfishness: random.integer(0, 100),
+    leadership: random.integer(0, 100),
+    patience: random.integer(0, 100),
+    attachmentToVillage: random.integer(0, 100),
+    ruleFollowing: random.integer(0, 100),
+  };
+  const specialty = dominantSkill(skills);
   return {
     id: `citizen-${String(serial).padStart(3, "0")}`,
+    name: createCitizenName(random),
     age: 0,
     job: "settler",
+    aspiration: createAspiration(traits, skills, specialty),
+    memories: [
+      {
+        day: birthDay,
+        type: "birth",
+        label: "이 마을에서 태어났다",
+        sentiment: "good",
+      },
+    ],
     position: {
       x: clamp(base.x, config.gridSize, config.mapWidth - config.gridSize),
       y: clamp(base.y, config.gridSize, config.mapHeight - config.gridSize),
@@ -88,19 +127,9 @@ export function createChild(
     canWork: false,
     action: "idle",
     groupId: home ? `home-${home.id}` : `group-${random.integer(1, 4)}`,
-    traits: {
-      cooperation: random.integer(0, 100),
-      riskTolerance: random.integer(0, 100),
-      savingPreference: random.integer(0, 100),
-      empathy: random.integer(0, 100),
-      selfishness: random.integer(0, 100),
-      leadership: random.integer(0, 100),
-      patience: random.integer(0, 100),
-      attachmentToVillage: random.integer(0, 100),
-      ruleFollowing: random.integer(0, 100),
-    },
+    traits,
     skills,
-    specialty: dominantSkill(skills),
+    specialty,
     winter: createWinterState(random),
     fatigue: 0,
     goal: "wander",

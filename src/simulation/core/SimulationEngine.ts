@@ -242,6 +242,8 @@ export class SimulationEngine {
         decisionReasons: citizen.decisionReasons.map((reason) => ({
           ...reason,
         })),
+        aspiration: { ...citizen.aspiration },
+        memories: citizen.memories.map((memory) => ({ ...memory })),
         traits: { ...citizen.traits },
         skills: { ...citizen.skills },
         thought: citizen.thought ? { ...citizen.thought } : undefined,

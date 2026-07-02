@@ -1,5 +1,9 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
+import {
+  recordHouseholdLoss,
+  recordMemory,
+} from "../life/LifeStorySystem";
 import type { Building, Citizen, SimulationState } from "../types";
 import { createChild } from "./PopulationFactory";
 
@@ -13,15 +17,33 @@ export function updatePopulationDynamics(
   state: SimulationState,
   config: SimulationConfig,
   random: SeededRandom,
+  day = 0,
 ): void {
-  ageCitizens(state, config);
-  applyOldAgeDeaths(state, config, random);
-  applyBirths(state, config, random);
+  ageCitizens(state, config, day);
+  applyOldAgeDeaths(state, config, random, day);
+  applyBirths(state, config, random, day);
 }
 
-function ageCitizens(state: SimulationState, config: SimulationConfig): void {
+function ageCitizens(
+  state: SimulationState,
+  config: SimulationConfig,
+  day: number,
+): void {
   for (const citizen of state.citizens) {
+    const before = citizen.age;
     citizen.age += config.agingYearsPerDay;
+    if (
+      before < config.childMaturityYears &&
+      citizen.age >= config.childMaturityYears
+    ) {
+      recordMemory(
+        citizen,
+        day,
+        "coming_of_age",
+        `성년이 되었다 — 꿈은 ${citizen.aspiration.label}`,
+        "good",
+      );
+    }
   }
 }
 
@@ -29,6 +51,7 @@ function applyOldAgeDeaths(
   state: SimulationState,
   config: SimulationConfig,
   random: SeededRandom,
+  day: number,
 ): void {
   const survivors: Citizen[] = [];
   for (const citizen of state.citizens) {
@@ -38,6 +61,7 @@ function applyOldAgeDeaths(
         config.oldAgeDeathChancePerDay * (1 + overAge / 10);
       if (random.chance(chance)) {
         state.dailyMetrics.deaths += 1;
+        recordHouseholdLoss(state, citizen, day, "death");
         continue;
       }
     }
@@ -50,6 +74,7 @@ function applyBirths(
   state: SimulationState,
   config: SimulationConfig,
   random: SeededRandom,
+  day: number,
 ): void {
   const population = state.citizens.length;
   if (population === 0) {
@@ -94,11 +119,32 @@ function applyBirths(
     if (!home) {
       break;
     }
-    state.citizens.push(
-      createChild(state.nextCitizenSerial, config, random, home),
+    const child = createChild(
+      state.nextCitizenSerial,
+      config,
+      random,
+      home,
+      day,
     );
+    state.citizens.push(child);
     state.nextCitizenSerial += 1;
     state.dailyMetrics.births += 1;
+    // 같은 집 식구들에게 아기의 탄생을 기억으로 남긴다.
+    for (const housemate of state.citizens) {
+      if (
+        housemate.id !== child.id &&
+        housemate.homeId &&
+        housemate.homeId === child.homeId
+      ) {
+        recordMemory(
+          housemate,
+          day,
+          "family_birth",
+          `집에 아기 ${child.name}이(가) 태어났다`,
+          "good",
+        );
+      }
+    }
   }
 }
 

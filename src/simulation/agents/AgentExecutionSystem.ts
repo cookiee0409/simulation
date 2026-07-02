@@ -10,6 +10,10 @@ import {
   insulateBuilding,
   repairBuilding,
 } from "../survival/BuildingInsulationSystem";
+import {
+  recordHouseholdLoss,
+  recordMemory,
+} from "../life/LifeStorySystem";
 import { recordScenarioEvent } from "../scenarios/ScenarioSystem";
 import { WINTER_BALANCE } from "../scenarios/mountainWinter/winterBalance";
 
@@ -61,7 +65,7 @@ export class AgentExecutionSystem {
         this.performShelterWork(citizen, state, day, "insulate");
         break;
       case "care_sick":
-        this.performCare(citizen, state);
+        this.performCare(citizen, state, day);
         break;
       case "migrate":
         this.performMigration(citizen, state, day);
@@ -143,16 +147,17 @@ export class AgentExecutionSystem {
             config.dailyProductionNoise,
           ) ?? 0),
       );
+    const delivered = takePersonalShare(citizen, amount);
     const winterWarehouse = state.scenario
       ? findNearestWarehouse(citizen, state)
       : undefined;
     if (winterWarehouse) {
       winterWarehouse.inventory.food = Math.min(
         winterWarehouse.capacity,
-        (winterWarehouse.inventory.food ?? 0) + amount,
+        (winterWarehouse.inventory.food ?? 0) + delivered,
       );
     } else {
-      farm.inventory.food = (farm.inventory.food ?? 0) + amount;
+      farm.inventory.food = (farm.inventory.food ?? 0) + delivered;
     }
     state.dailyMetrics.foodProduced += amount;
     pushVisualEvent(state, {
@@ -202,12 +207,13 @@ export class AgentExecutionSystem {
             ) ?? 0),
         ),
     );
+    const delivered = takePersonalShare(citizen, amount);
     const warehouse = findNearestWarehouse(citizen, state);
     if (warehouse) {
       const stored = warehouse.inventory.food ?? 0;
       warehouse.inventory.food = Math.min(
         warehouse.capacity,
-        stored + amount,
+        stored + delivered,
       );
       state.dailyMetrics.foodProduced += amount;
       state.dailyMetrics.foragedToday += amount;
@@ -715,6 +721,7 @@ export class AgentExecutionSystem {
   private performCare(
     citizen: Citizen,
     state: SimulationState,
+    day: number,
   ): void {
     const patient = state.citizens.find(
       (candidate) => candidate.id === citizen.targetId,
@@ -754,6 +761,23 @@ export class AgentExecutionSystem {
     if (state.scenario) {
       state.scenario.careActions += 1;
     }
+    // 심하게 아픈 이를 돌본 날은 서로에게 기억으로 남는다.
+    if (patient.winter.illness >= 30 || patient.health < 60) {
+      recordMemory(
+        citizen,
+        day,
+        "cared_other",
+        `앓아누운 ${patient.name}을(를) 간호했다`,
+        "good",
+      );
+      recordMemory(
+        patient,
+        day,
+        "was_cared",
+        `${citizen.name}의 간호를 받았다`,
+        "good",
+      );
+    }
     pushVisualEvent(state, {
       position: patient.position,
       icon: "💊",
@@ -776,6 +800,7 @@ export class AgentExecutionSystem {
     state.citizens = state.citizens.filter(
       (candidate) => candidate.id !== citizen.id,
     );
+    recordHouseholdLoss(state, citizen, day, "migration");
     state.dailyMetrics.migrations += 1;
     state.dailyMetrics.populationLost += 1;
     if (state.scenario) {
@@ -785,7 +810,7 @@ export class AgentExecutionSystem {
       type: "migration",
       day,
       title: "주민 이주",
-      description: `${citizen.id}이 생존을 위해 산길을 떠났습니다.`,
+      description: `${citizen.name}이(가) 생존을 위해 산길을 떠났습니다.`,
       severity: "warning",
       citizenId: citizen.id,
     });
@@ -860,6 +885,18 @@ function pushVisualEvent(
 
 function formatAmount(value: number): string {
   return value >= 10 ? Math.round(value).toString() : value.toFixed(1);
+}
+
+/**
+ * 절약 성향에 따라 수확의 일부(3~8%)를 개인 주머니에 챙긴다(총량 보존 —
+ * 챙긴 만큼 창고 납품이 줄어든다). 배고픈 비상시에 꺼내 먹는다.
+ */
+function takePersonalShare(citizen: Citizen, amount: number): number {
+  const ratio = 0.03 + citizen.traits.savingPreference * 0.0005;
+  const room = Math.max(0, 2.5 - citizen.winter.personalFood);
+  const share = Math.min(amount * ratio, room);
+  citizen.winter.personalFood += share;
+  return amount - share;
 }
 
 function complete(citizen: Citizen): void {

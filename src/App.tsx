@@ -279,10 +279,14 @@ export default function App() {
           />
           <WinterNeeds snapshot={snapshot} />
           {selectedCitizen ? (
-            <CitizenPanel citizen={selectedCitizen} />
+            <CitizenPanel
+              citizen={selectedCitizen}
+              citizens={snapshot.citizens}
+            />
           ) : (
             <div className="citizen-panel empty-selection">
-              지도에서 주민을 선택하면 체온, 질병, 기술과 의사결정 이유를 볼 수 있습니다.
+              지도에서 주민을 선택하면 이름과 꿈, 살아온 기억, 지금 이 일을
+              하는 이유를 볼 수 있습니다.
             </div>
           )}
           <EventTimeline snapshot={snapshot} />
@@ -512,30 +516,67 @@ function WinterNeeds({ snapshot }: { snapshot: SimulationSnapshot }) {
   );
 }
 
-function CitizenPanel({ citizen }: { citizen: Citizen }) {
+function CitizenPanel({
+  citizen,
+  citizens,
+}: {
+  citizen: Citizen;
+  citizens: Citizen[];
+}) {
+  const housemates = citizens.filter(
+    (other) =>
+      other.id !== citizen.id &&
+      other.homeId !== undefined &&
+      other.homeId === citizen.homeId,
+  );
+  const memories = citizen.memories.slice(-6).reverse();
   return (
     <section className="citizen-panel">
       <div className="citizen-title">
-        <div><p className="eyebrow">SELECTED CITIZEN</p><h3>{citizen.id}</h3></div>
+        <div>
+          <p className="eyebrow">SELECTED CITIZEN</p>
+          <h3>{citizen.name}</h3>
+        </div>
         <span>{citizen.age < 15 ? "아이" : JOB_LABELS[citizen.job]} · {Math.floor(citizen.age)}세</span>
       </div>
+      <p className="citizen-dream">🌱 꿈 · {citizen.aspiration.label}</p>
       <dl className="citizen-facts">
         <div><dt>행동</dt><dd>{GOAL_LABELS[citizen.goal]}</dd></div>
-        <div><dt>임시 역할</dt><dd>{citizen.temporaryRole ?? "없음"}</dd></div>
         <div><dt>전문 분야</dt><dd>{skillLabel(citizen.specialty)}</dd></div>
         <div><dt>현재 생각</dt><dd>{citizen.thought?.label ?? "안정"}</dd></div>
         <div><dt>체온</dt><dd>{citizen.winter.bodyTemperature.toFixed(1)}°C</dd></div>
-        <div><dt>추위 노출</dt><dd>{format(citizen.winter.coldExposure)}</dd></div>
         <div><dt>질병</dt><dd>{format(citizen.winter.illness)}</dd></div>
         <div><dt>건강</dt><dd>{format(citizen.health)}</dd></div>
-        <div><dt>농사 기술</dt><dd>{format(citizen.skills.farming)}</dd></div>
-        <div><dt>벌목 기술</dt><dd>{format(citizen.skills.logging)}</dd></div>
-        <div><dt>건축 기술</dt><dd>{format(citizen.skills.construction)}</dd></div>
-        <div><dt>교섭 기술</dt><dd>{format(citizen.skills.negotiation)}</dd></div>
-        <div><dt>의료 기술</dt><dd>{format(citizen.skills.medicine)}</dd></div>
+        <div><dt>개인 식량</dt><dd>{format(citizen.winter.personalFood)}</dd></div>
+        <div><dt>배고픔</dt><dd>{format(citizen.hunger)}</dd></div>
+        <div><dt>피로</dt><dd>{format(citizen.fatigue)}</dd></div>
+        <div className="wide">
+          <dt>한집 식구</dt>
+          <dd>
+            {housemates.length > 0
+              ? housemates.map((mate) => mate.name).join(", ")
+              : "없음"}
+          </dd>
+        </div>
       </dl>
+      <div className="life-story">
+        <b>살아온 기억</b>
+        {memories.length === 0 ? (
+          <p className="empty">아직 특별한 기억이 없습니다.</p>
+        ) : (
+          memories.map((memory) => (
+            <div
+              className={`life-story-row sentiment-${memory.sentiment}`}
+              key={`${memory.day}-${memory.type}`}
+            >
+              <b>D{memory.day}</b>
+              <span>{memory.label}</span>
+            </div>
+          ))
+        )}
+      </div>
       <div className="decision-reasons">
-        <b>행동 선택 점수 {format(citizen.decisionScore)}</b>
+        <b>지금 이 일을 하는 이유 (점수 {format(citizen.decisionScore)})</b>
         {citizen.decisionReasons.map((reason) => (
           <div key={`${reason.factor}-${reason.score}`}>
             <span>{reason.factor}</span>

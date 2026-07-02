@@ -1,4 +1,10 @@
 import type { SeededRandom } from "../core/SeededRandom";
+import {
+  hasMemorySince,
+  lastMemoryDay,
+  recordHouseholdLoss,
+  recordMemory,
+} from "../life/LifeStorySystem";
 import { recordScenarioEvent } from "../scenarios/ScenarioSystem";
 import { WINTER_BALANCE } from "../scenarios/mountainWinter/winterBalance";
 import type { SimulationState } from "../types";
@@ -25,6 +31,18 @@ export function updateWinterHealth(
     } else {
       citizen.winter.illness = Math.max(0, citizen.winter.illness - 1);
     }
+    if (
+      citizen.winter.illness >= 45 &&
+      !hasMemorySince(citizen, "fell_ill", day - 8)
+    ) {
+      recordMemory(citizen, day, "fell_ill", "심하게 앓아누웠다", "bad");
+    } else if (
+      citizen.winter.illness < 12 &&
+      lastMemoryDay(citizen, "fell_ill") >
+        lastMemoryDay(citizen, "recovered")
+    ) {
+      recordMemory(citizen, day, "recovered", "병을 이겨냈다", "good");
+    }
     const illnessChance =
       citizen.winter.frostbiteRisk / 1600 +
       (temperature < 35 ? 0.04 : 0);
@@ -36,7 +54,7 @@ export function updateWinterHealth(
         type: "hypothermia",
         day,
         title: "저체온 위험 주민 발생",
-        description: `${citizen.id}의 체온이 ${temperature.toFixed(1)}°C까지 내려갔습니다.`,
+        description: `${citizen.name}의 체온이 ${temperature.toFixed(1)}°C까지 내려갔습니다.`,
         severity: "warning",
         citizenId: citizen.id,
       });
@@ -52,11 +70,12 @@ export function updateWinterHealth(
       state.scenario.deaths += 1;
       state.dailyMetrics.deaths += 1;
       state.dailyMetrics.winterDeaths += 1;
+      recordHouseholdLoss(state, citizen, day, "death");
       recordScenarioEvent(state, {
         type: "death",
         day,
         title: "주민 사망",
-        description: `${citizen.id}가 혹한과 질병을 견디지 못했습니다.`,
+        description: `${citizen.name}이(가) 혹한과 질병을 견디지 못했습니다.`,
         severity: "critical",
         citizenId: citizen.id,
       });

@@ -83,6 +83,45 @@ export interface CitizenThought {
   reason: "hunger" | "cold" | "fatigue" | "illness" | "low_health" | "migration";
 }
 
+// --- 개인 서사: 기억과 인생 목표 ---
+
+/** NPC 일생에 남는 사건의 종류. 일대기 패널과 의사결정 편향에 쓰인다. */
+export type LifeEventType =
+  | "founder"
+  | "birth"
+  | "coming_of_age"
+  | "starvation"
+  | "fell_ill"
+  | "recovered"
+  | "was_cared"
+  | "cared_other"
+  | "lost_housemate"
+  | "housemate_left"
+  | "family_birth"
+  | "job_change"
+  | "winter_survived";
+
+export interface LifeEvent {
+  day: number;
+  type: LifeEventType;
+  label: string;
+  sentiment: "good" | "bad" | "neutral";
+}
+
+export type AspirationType =
+  | "mastery"
+  | "family"
+  | "wealth"
+  | "protector"
+  | "healer";
+
+/** 성격·재능에서 결정되는 인생 목표. 일상 선택에 지속적인 편향을 준다. */
+export interface CitizenAspiration {
+  type: AspirationType;
+  label: string;
+  skill?: CitizenSkillName;
+}
+
 export type TemporaryRole =
   | "wood_gatherer"
   | "food_gatherer"
@@ -108,8 +147,11 @@ export interface WinterCitizenState {
 
 export interface Citizen {
   id: string;
+  name: string;
   age: number;
   job: CitizenJob;
+  aspiration: CitizenAspiration;
+  memories: LifeEvent[];
   position: GridPosition;
   homeId?: string;
   wealth: number;

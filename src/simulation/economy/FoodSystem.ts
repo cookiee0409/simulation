@@ -1,5 +1,10 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
+import {
+  hasMemorySince,
+  recordHouseholdLoss,
+  recordMemory,
+} from "../life/LifeStorySystem";
 import type { Citizen, SimulationState } from "../types";
 
 export interface FoodDayResult {
@@ -17,6 +22,7 @@ export function processFoodDay(
   state: SimulationState,
   config: SimulationConfig,
   random: SeededRandom,
+  day = 0,
 ): FoodDayResult {
   const required = state.citizens.length * config.foodPerCitizenPerDay;
   const consumed = state.dailyMetrics.foodConsumed;
@@ -24,6 +30,19 @@ export function processFoodDay(
 
   for (const citizen of state.citizens) {
     updateCitizenWellbeing(citizen, satisfaction, config);
+    // 극심한 굶주림은 평생 남는 기억이 된다(같은 위기는 5일에 한 번만 기록).
+    if (
+      citizen.hunger >= config.emergencyHungerThreshold + 25 &&
+      !hasMemorySince(citizen, "starvation", day - 5)
+    ) {
+      recordMemory(
+        citizen,
+        day,
+        "starvation",
+        "며칠을 굶주리며 버텼다",
+        "bad",
+      );
+    }
   }
 
   const survivors: Citizen[] = [];
@@ -34,6 +53,7 @@ export function processFoodDay(
     if (shouldLeaveFromHunger(citizen, config, random, villageHasFoodBuffer)) {
       citizen.action = "leaving";
       populationLost += 1;
+      recordHouseholdLoss(state, citizen, day, "death");
       if (state.scenario) {
         state.scenario.deaths += 1;
         state.dailyMetrics.deaths += 1;

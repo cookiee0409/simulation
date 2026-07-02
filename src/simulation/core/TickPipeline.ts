@@ -43,7 +43,7 @@ export class TickPipeline {
 
     for (const citizen of citizens) {
       unstickFromBuildings(citizen, state, config);
-      this.needs.updateCitizen(citizen, config);
+      this.needs.updateCitizen(citizen, config, state);
       if (this.decision.shouldReconsider(citizen, state, config)) {
         const perception = this.perception.observe(
           citizen,

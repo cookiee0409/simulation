@@ -220,8 +220,11 @@ describe("자율 에이전트 시스템", () => {
 function createCitizen(overrides: Partial<Citizen> = {}): Citizen {
   return {
     id: "citizen-001",
+    name: "김하준",
     age: 30,
     job: "unemployed",
+    aspiration: { type: "mastery", label: "마을 제일의 농사꾼이 되는 것", skill: "farming" },
+    memories: [],
     position: { x: 40, y: 40 },
     wealth: 100,
     hunger: 10,

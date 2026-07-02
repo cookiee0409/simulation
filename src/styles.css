@@ -477,6 +477,60 @@ h1 {
   white-space: nowrap;
 }
 
+.citizen-dream {
+  margin: 0 0 10px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(213, 228, 200, 0.55);
+  color: #3c5c45;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.citizen-facts .wide {
+  grid-column: 1 / -1;
+}
+
+.citizen-facts .wide dd {
+  white-space: normal;
+}
+
+.life-story {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(48, 73, 57, 0.1);
+}
+
+.life-story > b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.68rem;
+}
+
+.life-story-row {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  margin-bottom: 3px;
+  font-size: 0.64rem;
+  color: #627067;
+  background: rgba(226, 232, 221, 0.5);
+}
+
+.life-story-row b {
+  color: #283d30;
+}
+
+.life-story-row.sentiment-good span {
+  color: #3f754c;
+}
+
+.life-story-row.sentiment-bad span {
+  color: #a45d4f;
+}
+
 .decision-reasons {
   margin-top: 10px;
   padding-top: 10px;

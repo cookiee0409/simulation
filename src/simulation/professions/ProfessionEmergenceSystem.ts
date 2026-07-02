@@ -1,6 +1,7 @@
 import type { SimulationConfig } from "../core/SimulationConfig";
 import type { SeededRandom } from "../core/SeededRandom";
 import { requestBuilding } from "../city/BuildingConstruction";
+import { recordMemory } from "../life/LifeStorySystem";
 import type {
   Citizen,
   ProfessionOpportunity,
@@ -31,6 +32,7 @@ export function updateProfessionEmergence(
   state: SimulationState,
   config: SimulationConfig,
   random: SeededRandom,
+  day = 0,
 ): ProfessionOpportunity[] {
   const previous = new Map(
     state.opportunities.map((o) => [o.profession, o.sustainedDays]),
@@ -47,7 +49,7 @@ export function updateProfessionEmergence(
   }
 
   state.opportunities = opportunities;
-  applyEmergence(state, config, opportunities, random);
+  applyEmergence(state, config, opportunities, random, day);
   return opportunities;
 }
 
@@ -154,6 +156,7 @@ function applyEmergence(
   config: SimulationConfig,
   opportunities: ProfessionOpportunity[],
   random: SeededRandom,
+  day: number,
 ): void {
   const isFood = (profession: string) =>
     PROFESSION_DEFINITIONS.find((d) => d.id === profession)?.relatedNeeds.includes(
@@ -207,6 +210,13 @@ function applyEmergence(
 
     candidate.job = def.id;
     candidate.action = "working";
+    recordMemory(
+      candidate,
+      day,
+      "job_change",
+      `마을에 ${def.label}의 일이 생겨 ${def.label}가 되었다`,
+      "good",
+    );
     opportunity.sustainedDays = 0;
     if (food) emergedFood += 1;
     else emergedNonFood += 1;
